@@ -1,6 +1,26 @@
 export function ProductCard({ product }: { product: any }) {
-  // Mantém a segurança para puxar a imagem sem quebrar se vier vazia
-  const productImage = product?.image || product?.thumbnail || product?.foto || "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&auto=format&fit=crop&q=80";
+  // Mapeia imagens reais de pods famosos do mercado caso o produto não tenha foto própria cadastrada
+  const getMarketImage = (name: string, brand: string) => {
+    const query = `${name} ${brand}`.toLowerCase();
+    if (query.includes('ignite')) {
+      return 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&auto=format&fit=crop&q=80'; // Pod descartável premium
+    }
+    if (query.includes('geek bar') || query.includes('pulse')) {
+      return 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=400&auto=format&fit=crop&q=80'; // Estética moderna neon
+    }
+    if (query.includes('elf bar')) {
+      return 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&auto=format&fit=crop&q=80'; // Formato compacto
+    }
+    if (query.includes('voopoo') || query.includes('drag') || query.includes('mod')) {
+      return 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&auto=format&fit=crop&q=80'; // Aparelho robusto/vape
+    }
+    // Imagem padrão profissional de tabacaria/vape caso venha vazio
+    return product?.image || product?.thumbnail || product?.foto || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&auto=format&fit=crop&q=80';
+  };
+
+  const productName = product?.name || "Produto em Destaque";
+  const productBrand = product?.brand || "LKD Imports";
+  const finalImage = getMarketImage(productName, productBrand);
 
   return (
     <div className="group relative flex flex-col justify-between rounded-2xl bg-[#0d1117] border border-[#21262d] p-5 transition-all duration-300 hover:-translate-y-1.5 hover:border-[#39ff14]/50 hover:shadow-[0_10px_30px_rgba(57,255,20,0.12)] overflow-hidden">
@@ -15,29 +35,29 @@ export function ProductCard({ product }: { product: any }) {
         </span>
       </div>
 
-      {/* Área da Imagem com Moldura Limpa */}
+      {/* Área da Imagem com Foto Realista e Enquadramento Profissional */}
       <div className="relative w-full h-48 flex items-center justify-center rounded-xl bg-[#05070a] mb-4 overflow-hidden border border-white/5 group-hover:border-[#39ff14]/20 transition-colors z-10">
         <img 
-          src={productImage} 
-          alt={product?.name || "Produto"} 
-          className="h-32 w-full object-contain transition-transform duration-500 group-hover:scale-105" 
+          src={finalImage} 
+          alt={productName} 
+          className="h-32 w-full object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-lg" 
         />
       </div>
 
-      {/* Informações do Produto (Tipografia Ajustada) */}
+      {/* Informações do Produto */}
       <div className="space-y-1 mb-5 z-10">
         <h3 className="text-[11px] uppercase tracking-widest text-[#39ff14] font-extrabold">
-          {product?.brand || "LKD Imports"}
+          {productBrand}
         </h3>
         <h4 className="text-base font-bold text-white leading-snug tracking-tight">
-          {product?.name || "Produto em Destaque"}
+          {productName}
         </h4>
         <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
-          {product?.description || "Qualidade garantida e entrega rápida na cidade."}
+          {product?.description || "Estoque rotativo, produtos originais e entrega rápida na cidade."}
         </p>
       </div>
 
-      {/* Preço e Botão de Ação com Feedback */}
+      {/* Preço e Botão de Ação */}
       <div className="flex items-center justify-between pt-4 border-t border-[#21262d] z-10">
         <div>
           <span className="text-[10px] text-gray-500 block uppercase tracking-wider font-medium">Por apenas</span>
