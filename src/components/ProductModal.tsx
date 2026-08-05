@@ -25,6 +25,19 @@ export function ProductModal({ product, isOpen, onClose, onAddToCart }: Props) {
     }
   }, [product]);
 
+  // ESSA É A MÁGICA QUE TRAVA O FUNDO E ACABA COM O LAG/PULOS DA TELA
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    // Limpa a trava caso o componente seja desmontado
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen || !product) return null;
 
   const handleAdd = () => {
@@ -56,6 +69,7 @@ export function ProductModal({ product, isOpen, onClose, onAddToCart }: Props) {
           )}
         </div>
 
+        {/* Corpo do Modal - Onde a rolagem vai funcionar perfeitamente agora */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-widest text-inkSoft">{product.brand}</p>
@@ -130,3 +144,4 @@ export function ProductModal({ product, isOpen, onClose, onAddToCart }: Props) {
     </div>
   );
 }
+
