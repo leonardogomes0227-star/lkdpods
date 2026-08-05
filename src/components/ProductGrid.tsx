@@ -24,7 +24,6 @@ export function ProductGrid({ onAdd, query }: Props) {
   const [sort, setSort] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
 
   const filtered = useMemo(() => {
-    // Guard against undefined/empty products array
     const safe = Array.isArray(products) ? products : [];
     let list = safe.filter((p) => {
       if (!p) return false;
@@ -48,33 +47,31 @@ export function ProductGrid({ onAdd, query }: Props) {
 
   return (
     <section id="vitrine" className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20">
-      {/* Section heading */}
       <Reveal>
         <div className="mb-8">
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-neon-400/60">
+          <p className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">
             Vitrine
           </p>
-          <h2 className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+          <h2 className="font-display text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
             Produtos em destaque
           </h2>
-          <p className="mt-1.5 text-sm font-light text-white/40">
+          <p className="mt-1.5 text-sm text-inkSoft">
             Estoque rotativo — quando acaba, acaba. Garanta o seu.
           </p>
         </div>
       </Reveal>
 
-      {/* Toolbar: count + sort */}
       <Reveal delay={60}>
         <div className="mb-6 flex items-center justify-between gap-2">
-          <p className="text-sm font-light text-white/50">
-            <span className="font-semibold text-white">{filtered.length}</span> produto(s)
+          <p className="text-sm text-inkSoft">
+            <span className="font-semibold text-ink">{filtered.length}</span> produto(s)
           </p>
           <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-white/40" />
+            <SlidersHorizontal className="h-4 w-4 text-inkSoft" />
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as typeof sort)}
-              className="rounded-xl border border-ink-700/60 bg-ink-925 px-3 py-2.5 text-sm text-white outline-none transition focus:border-neon-500/50"
+              className="rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-accent/50"
             >
               <option value="featured">Destaques</option>
               <option value="price-asc">Menor preço</option>
@@ -84,7 +81,6 @@ export function ProductGrid({ onAdd, query }: Props) {
         </div>
       </Reveal>
 
-      {/* Category pills */}
       <Reveal delay={100}>
         <div className="mb-8 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
           {CATEGORIES.map((c) => (
@@ -93,8 +89,8 @@ export function ProductGrid({ onAdd, query }: Props) {
               onClick={() => setCat(c)}
               className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 hover:scale-105 active:scale-95 ${
                 cat === c
-                  ? 'bg-neon-500 text-black shadow-[0_0_20px_-6px_rgba(57,255,20,0.5)]'
-                  : 'border border-ink-700/60 bg-ink-925 text-white/60 hover:border-neon-500/40 hover:text-white'
+                  ? 'bg-ink text-white'
+                  : 'border border-line bg-white text-inkSoft hover:border-accent/40 hover:text-ink'
               }`}
             >
               {c}
@@ -103,18 +99,15 @@ export function ProductGrid({ onAdd, query }: Props) {
         </div>
       </Reveal>
 
-      {/* Grid — staggered reveal */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-ink-700/50 bg-ink-925/60 py-20 text-center">
-          <PackageSearch className="h-10 w-10 text-white/20" />
-          <p className="text-sm font-light text-white/40">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-white py-20 text-center">
+          <PackageSearch className="h-10 w-10 text-line" />
+          <p className="text-sm text-inkSoft">
             Nenhum produto encontrado para sua busca.
           </p>
           <button
-            onClick={() => {
-              setCat('Todos');
-            }}
-            className="mt-1 rounded-lg border border-ink-700 px-4 py-2 text-xs font-semibold text-white/70 transition hover:border-neon-500/40 hover:text-white"
+            onClick={() => { setCat('Todos'); }}
+            className="mt-1 rounded-lg border border-line px-4 py-2 text-xs font-semibold text-inkSoft transition hover:border-accent/40 hover:text-ink"
           >
             Limpar filtros
           </button>
