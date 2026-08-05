@@ -10,6 +10,13 @@ import {
 import type { CartItem, Coupon, Product } from './types';
 import { storage, uid, ADMIN_CREDENTIALS } from './storage';
 
+// NOVA INTERFACE PARA REGISTRO DE VENDAS
+export interface Sale {
+  id: string;
+  amount: number;
+  timestamp: number;
+}
+
 interface StoreContextValue {
   products: Product[];
   coupons: Coupon[];
@@ -21,7 +28,14 @@ interface StoreContextValue {
   total: number;
   isAuthed: boolean;
   flashDeadline: number;
-  // cart (agora aceita flavor)
+  
+  // NOVAS VARIÁVEIS DE FECHAMENTO
+  dailyTotal: number;
+  weeklyTotal: number;
+  monthlyTotal: number;
+  recordSale: (amount: number) => void;
+
+  // cart
   addToCart: (product: Product, qty?: number, flavor?: string) => void;
   removeFromCart: (productId: string, flavor: string) => void;
   setQty: (productId: string, flavor: string, qty: number) => void;
@@ -49,9 +63,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(() => storage.getProducts());
   const [coupons, setCoupons] = useState<Coupon[]>(() => storage.getCoupons());
   
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    // Para simplificar, o storage inicial vai começar vazio ou com o que tiver
-    return [];
+  const [cart, setCart] = useState<CartItem[]>([]);
+  
+  // NOVO ESTADO QUE GUARDA AS VENDAS (Salvo no LocalStorage por enquanto)
+  const [sales, setSales] = useState<Sale[]>(() => {
+    const saved = localStorage.getItem('lkd_sales');
+    return saved ? JSON.parse(saved) : [];
   });
   
   const [couponCode, setCouponCode] = useState<string | null>(null);
@@ -66,7 +83,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     storage.saveCoupons(coupons);
   }, [coupons]);
 
-  // Função nova de adicionar ao carrinho
+  // SALVA AS VENDAS SEMPRE QUE HOUVER UM NOVO PEDIDO
+  useEffect(() => {
+    localStorage.setItem('lkd_sales', JSON.stringify(sales));
+  }, [sales]);
+
+  // LÓGICA MATEMÁTICA DOS FECHAMENTOS
+  const { dailyTotal, weeklyTotal, monthlyTotal } = useMemo(() => {
+    const now = new Date();
+    // Início do dia de hoje (00:00:00)
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    // Início da semana (7 dias atrás)
+    const startOfWeek = startOfDay - 6 * 24 * 60 * 60 * 1000; 
+    // Início do mês atual
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    let daily = 0;
+    let weekly = 0;
+    let monthly = 0;
+
+    sales.forEach((sale) => {
+      if (sale.timestamp >= startOfDay) daily += sale.amount;
+      if (sale.timestamp >= startOfWeek) weekly += sale.amount;
+      if (sale.timestamp >= startOfMonth) monthly += sale.amount;
+    });
+
+    return { dailyTotal: daily, weeklyTotal: weekly, monthlyTotal: monthly };
+  }, [sales]);
+
+  // FUNÇÃO PARA REGISTRAR A VENDA
+  const recordSale = useCallback((amount: number) => {
+    setSales((prev) => [...prev, { id: uid(), amount, timestamp: Date.now() }]);
+  }, []);
+
   const addToCart = useCallback((product: Product, qty = 1, flavor = '') => {
     setCart((prev) => {
       const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
@@ -206,6 +255,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     total,
     isAuthed,
     flashDeadline,
+    
+    dailyTotal,
+    weeklyTotal,
+    monthlyTotal,
+    recordSale,
+
     addToCart,
     removeFromCart,
     setQty,
