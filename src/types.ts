@@ -6,7 +6,7 @@ export interface Product {
   brand: string;
   category: Category;
   flavor: string;
-  description?: string; // Adicionado para suportar a descrição do painel
+  description?: string;
   price: number;
   cost: number;
   stock: number;
@@ -26,7 +26,7 @@ export interface Coupon {
 export interface CartItem {
   product: Product;
   quantity: number;
-  selectedFlavor: string; // O carrinho agora sabe qual foi o sabor escolhido
+  selectedFlavor: string;
 }
 
 export type PaymentMethod = 'PIX' | 'Cartão' | 'Dinheiro';
@@ -39,6 +39,7 @@ export interface CheckoutInfo {
   reference: string;
   payment: PaymentMethod | null;
   troco: string;
+  deliveryFee: number; // <- AGORA SIM! A taxa de entrega está aqui
 }
 
 export interface AdminUser {
