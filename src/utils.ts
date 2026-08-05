@@ -1,53 +1,53 @@
 import type { CartItem, CheckoutInfo, Coupon } from './types';
-import { STORE_CITY, STORE_WHATSAPP } from './storage';
 
 export function formatBRL(value: number): string {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value);
 }
 
 export function buildWhatsAppMessage(
-  items: CartItem[],
+  cart: CartItem[],
   info: CheckoutInfo,
   coupon: Coupon | null,
   subtotal: number,
   discount: number,
-  total: number,
+  total: number
 ): string {
-  const lines: string[] = [];
-  lines.push('*🛒 NOVO PEDIDO — LKD IMPORTS*');
-  lines.push('');
-  lines.push('*ITENS DO PEDIDO*');
-  items.forEach((item, i) => {
-    lines.push(
-      `${i + 1}. ${item.product.brand} ${item.product.name} — ${item.product.flavor}`,
-    );
-    lines.push(
-      `   ${item.quantity}x ${formatBRL(item.product.price)} = *${formatBRL(item.product.price * item.quantity)}*`,
-    );
-  });
-  lines.push('');
-  lines.push(`Subtotal: ${formatBRL(subtotal)}`);
-  if (coupon && discount > 0) {
-    lines.push(`Cupom aplicado: *${coupon.code}* (${coupon.discountPercent}% OFF)`);
-    lines.push(`Desconto: -${formatBRL(discount)}`);
-  }
-  lines.push(`*TOTAL: ${formatBRL(total)}*`);
-  lines.push('');
-  lines.push('*DADOS DO CLIENTE*');
-  lines.push(`Nome: ${info.name}`);
-  lines.push(
-    `Endereço: ${info.address}, ${info.number} — ${info.district}`,
-  );
-  if (info.reference) lines.push(`Referência: ${info.reference}`);
-  lines.push('');
-  lines.push('*PAGAMENTO*');
-  lines.push(`Forma: ${info.payment}`);
-  if (info.payment === 'Dinheiro' && info.troco) {
-    lines.push(`Troco para: ${info.troco}`);
-  }
-  lines.push('');
-  lines.push(`🚀 Entrega rápida e exclusiva para ${STORE_CITY}.`);
+  
+  // O seu número oficial do WhatsApp já configurado com DDI (55) e DDD (67)
+  const PHONE_NUMBER = "556796422689"; 
 
-  const text = encodeURIComponent(lines.join('\n'));
-  return `https://wa.me/${STORE_WHATSAPP}?text=${text}`;
+  let text = `*NOVO PEDIDO - LKD IMPORTS* 🚀\n\n`;
+  
+  text += `*🛍️ ITENS DO PEDIDO:*\n`;
+  cart.forEach((item) => {
+    text += `▪️ ${item.quantity}x ${item.product.brand} ${item.product.name} (${item.selectedFlavor})\n`;
+  });
+  
+  text += `\n*🚚 DADOS DE ENTREGA:*\n`;
+  text += `👤 Nome: ${info.name}\n`;
+  text += `📍 Endereço: ${info.address}, Nº ${info.number}\n`;
+  text += `🏘️ Bairro: ${info.district}\n`;
+  if (info.reference) text += `📌 Ref: ${info.reference}\n`;
+  
+  text += `\n*💳 PAGAMENTO E VALORES:*\n`;
+  text += `Subtotal: ${formatBRL(subtotal)}\n`;
+  
+  if (coupon && discount > 0) {
+    text += `Cupom (${coupon.code}): -${formatBRL(discount)}\n`;
+  }
+  
+  text += `Taxa de Entrega: ${formatBRL(info.deliveryFee)}\n`;
+  text += `*TOTAL A PAGAR: ${formatBRL(total)}*\n\n`;
+  
+  text += `Forma de Pagamento: ${info.payment}\n`;
+  if (info.payment === 'Dinheiro' && info.troco) {
+    text += `Troco para: ${info.troco}\n`;
+  }
+  
+  // Transforma o texto para o formato de link do WhatsApp
+  const encoded = encodeURIComponent(text);
+  return `https://wa.me/${PHONE_NUMBER}?text=${encoded}`;
 }
