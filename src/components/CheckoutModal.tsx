@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Check, Landmark, Banknote, CreditCard, MapPin, Rocket, User, X, Map } from 'lucide-react';
+import { ArrowRight, Check, Landmark, Banknote, CreditCard, MapPin, User, X, Map, Phone } from 'lucide-react';
 import type { CheckoutInfo, PaymentMethod } from '../types';
 import { useStore } from '../store';
 import { buildWhatsAppMessage, formatBRL } from '../utils';
@@ -17,23 +17,24 @@ const PAYMENTS: { key: PaymentMethod; label: string; icon: typeof Landmark }[] =
 ];
 
 export function CheckoutModal({ open, onClose, onDone }: Props) {
-  const { cart, subtotal, discount, total, appliedCoupon, clearCart } = useStore();
+  // AQUI ADICIONAMOS O recordSale PARA SALVAR O DINHEIRO DA VENDA
+  const { cart, subtotal, discount, total, appliedCoupon, clearCart, recordSale } = useStore();
   
   const [info, setInfo] = useState<CheckoutInfo>({
     name: '',
+    phone: '', // CAMPO DE TELEFONE ADICIONADO AQUI
     address: '',
     number: '',
     district: '',
     reference: '',
     payment: null,
     troco: '',
-    deliveryFee: 8, // Começa cobrando R$ 8 padrão
+    deliveryFee: 8,
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sent, setSent] = useState(false);
 
-  // É AQUI QUE A MÁGICA ACONTECE: O total final soma os produtos + a taxa de entrega
   const finalTotal = total + info.deliveryFee;
 
   if (!open) return null;
@@ -41,6 +42,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
   const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (!info.name.trim()) e.name = 'Informe seu nome.';
+    if (!info.phone.trim()) e.phone = 'Informe seu telefone/WhatsApp.'; // VALIDAÇÃO DO TELEFONE
     if (!info.address.trim()) e.address = 'Informe a rua.';
     if (!info.number.trim()) e.number = 'Informe o número.';
     if (!info.district.trim()) e.district = 'Informe o bairro.';
@@ -61,6 +63,10 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
       discount,
       finalTotal, 
     );
+    
+    // AVISA O SISTEMA QUE A VENDA ACONTECEU PARA SOMAR NO FECHAMENTO!
+    recordSale(finalTotal);
+    
     window.open(url, '_blank');
     setSent(true);
   };
@@ -70,6 +76,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
       clearCart();
       setInfo({
         name: '',
+        phone: '', // LIMPA O TELEFONE DEPOIS DA COMPRA
         address: '',
         number: '',
         district: '',
@@ -136,6 +143,17 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               />
             </Field>
 
+            {/* NOVO CAMPO DO TELEFONE PARA O ENTREGADOR LIGAR */}
+            <Field label="WhatsApp / Celular" icon={<Phone className="h-3.5 w-3.5" />} error={errors.phone}>
+              <input
+                type="tel"
+                value={info.phone}
+                onChange={(e) => setInfo({ ...info, phone: e.target.value })}
+                placeholder="(67) 99999-9999"
+                className={inputCls(errors.phone)}
+              />
+            </Field>
+
             <div className="mb-4">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
                 <MapPin className="h-3.5 w-3.5" /> Endereço Completo
@@ -176,7 +194,6 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               </div>
             </div>
 
-            {/* SELEÇÃO DA TAXA DE ENTREGA */}
             <div className="mb-4">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
                 <Map className="h-3.5 w-3.5" /> Taxa de Entrega
@@ -248,7 +265,6 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               </div>
             )}
 
-            {/* RESUMO DO PEDIDO COM A TAXA SOMADA */}
             <div className="rounded-xl border border-line bg-bgAlt p-4 mt-2">
               <p className="mb-3 text-xs font-bold uppercase tracking-wide text-inkSoft">
                 Resumo do Pedido
