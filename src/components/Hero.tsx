@@ -31,13 +31,13 @@ export function Hero() {
 
           <Reveal delay={240}>
             <div className="mt-8 flex flex-wrap gap-3">
-              
+              <a
                 href="#vitrine"
                 className="rounded-xl bg-ink px-6 py-3 text-sm font-bold text-white transition-all duration-300 hover:bg-accent active:scale-95"
               >
                 Ver produtos
               </a>
-              
+              <a
                 href="#vitrine"
                 className="rounded-xl border border-line bg-white px-6 py-3 text-sm font-semibold text-ink transition-all duration-300 hover:border-accent/40 active:scale-95"
               >
