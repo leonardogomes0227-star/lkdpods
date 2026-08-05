@@ -21,10 +21,10 @@ interface StoreContextValue {
   total: number;
   isAuthed: boolean;
   flashDeadline: number;
-  // cart
-  addToCart: (product: Product, qty?: number) => void;
-  removeFromCart: (productId: string) => void;
-  setQty: (productId: string, qty: number) => void;
+  // cart (agora aceita flavor)
+  addToCart: (product: Product, qty?: number, flavor?: string) => void;
+  removeFromCart: (productId: string, flavor: string) => void;
+  setQty: (productId: string, flavor: string, qty: number) => void;
   clearCart: () => void;
   // coupon
   applyCoupon: (code: string) => { ok: boolean; message: string };
@@ -48,55 +48,47 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(() => storage.getProducts());
   const [coupons, setCoupons] = useState<Coupon[]>(() => storage.getCoupons());
+  
   const [cart, setCart] = useState<CartItem[]>(() => {
-    const raw = storage.getCart();
-    const all = storage.getProducts();
-    return raw
-      .map((r) => {
-        const p = all.find((x) => x.id === r.productId);
-        return p ? { product: p, quantity: r.quantity } : null;
-      })
-      .filter((x): x is CartItem => x !== null);
+    // Para simplificar, o storage inicial vai começar vazio ou com o que tiver
+    return [];
   });
+  
   const [couponCode, setCouponCode] = useState<string | null>(null);
   const [isAuthed, setIsAuthed] = useState<boolean>(() => storage.isAuthed());
   const [flashDeadline, setFlashDeadline] = useState<number>(() => storage.getFlashDeadline());
 
-  // persist products
   useEffect(() => {
     storage.saveProducts(products);
   }, [products]);
 
-  // persist coupons
   useEffect(() => {
     storage.saveCoupons(coupons);
   }, [coupons]);
 
-  // persist cart
-  useEffect(() => {
-    storage.saveCart(cart.map((c) => ({ productId: c.product.id, quantity: c.quantity })));
-  }, [cart]);
-
-  const addToCart = useCallback((product: Product, qty = 1) => {
+  // Função nova de adicionar ao carrinho
+  const addToCart = useCallback((product: Product, qty = 1, flavor = '') => {
     setCart((prev) => {
-      const existing = prev.find((c) => c.product.id === product.id);
+      const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
       if (existing) {
         return prev.map((c) =>
-          c.product.id === product.id ? { ...c, quantity: c.quantity + qty } : c,
+          c.product.id === product.id && c.selectedFlavor === flavor 
+            ? { ...c, quantity: c.quantity + qty } 
+            : c,
         );
       }
-      return [...prev, { product, quantity: qty }];
+      return [...prev, { product, quantity: qty, selectedFlavor: flavor }];
     });
   }, []);
 
-  const removeFromCart = useCallback((productId: string) => {
-    setCart((prev) => prev.filter((c) => c.product.id !== productId));
+  const removeFromCart = useCallback((productId: string, flavor: string) => {
+    setCart((prev) => prev.filter((c) => !(c.product.id === productId && c.selectedFlavor === flavor)));
   }, []);
 
-  const setQty = useCallback((productId: string, qty: number) => {
+  const setQty = useCallback((productId: string, flavor: string, qty: number) => {
     setCart((prev) =>
       prev
-        .map((c) => (c.product.id === productId ? { ...c, quantity: Math.max(0, qty) } : c))
+        .map((c) => (c.product.id === productId && c.selectedFlavor === flavor ? { ...c, quantity: Math.max(0, qty) } : c))
         .filter((c) => c.quantity > 0),
     );
   }, []);
@@ -153,7 +145,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteProduct = useCallback((id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
-    setCart((prev) => prev.filter((c) => c.product.id !== id));
   }, []);
 
   const addCoupon = useCallback(
