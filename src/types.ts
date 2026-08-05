@@ -13,7 +13,7 @@ export interface Product {
   views: number;
   emoji: string;
   gradient: string;
-  image?: string; // <--- AGORA O PRODUTO ACEITA FOTO REAL!
+  image?: string;
   featured?: boolean;
 }
 
@@ -34,6 +34,7 @@ export type PaymentMethod = 'PIX' | 'Cartão' | 'Dinheiro';
 
 export interface CheckoutInfo {
   name: string;
+  phone: string; // <--- O TELEFONE ESTÁ AQUI AGORA!
   address: string;
   number: string;
   district: string;
