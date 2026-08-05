@@ -11,6 +11,7 @@ import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AdminLogin } from './components/AdminLogin';
 import { AdminDashboard } from './components/AdminDashboard';
+import { ProductModal } from './components/ProductModal'; // Importando o modal novo!
 import type { Product } from './types';
 
 function Toast({ message }: { message: string }) {
@@ -34,7 +35,6 @@ function Footer() {
           <Reveal>
             <div>
               <div className="flex items-center gap-2">
-                {/* Ícone agora é um quadrado escuro minimalista, sem brilho */}
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink font-display text-lg font-bold text-white shadow-sm">
                   L
                 </div>
@@ -101,16 +101,21 @@ function Footer() {
 
 function StoreFront() {
   const { flashDeadline, isAuthed, addToCart } = useStore();
+  
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  
+  // Novos estados para o Modal do Produto
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productModalOpen, setProductModalOpen] = useState(false);
 
-  const handleAdd = (p: Product) => {
-    addToCart(p);
-    setToast(`${p.brand} ${p.name} adicionado ao carrinho!`);
-    setTimeout(() => setToast(null), 2500);
+  // Agora ele abre o modal em vez de colocar direto no carrinho
+  const handleProductClick = (p: Product) => {
+    setSelectedProduct(p);
+    setProductModalOpen(true);
   };
 
   if (isAuthed) {
@@ -129,7 +134,7 @@ function StoreFront() {
           setSearch={setSearch}
         />
         <Hero />
-        <ProductGrid onAdd={handleAdd} query={search} />
+        <ProductGrid onAdd={handleProductClick} query={search} />
         <Footer />
       </div>
 
@@ -146,8 +151,20 @@ function StoreFront() {
         onClose={() => setCheckoutOpen(false)}
         onDone={() => setCheckoutOpen(false)}
       />
-      {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} />}
+      
+      {/* Aqui fica o Modal do Produto */}
+      <ProductModal
+        product={selectedProduct}
+        isOpen={productModalOpen}
+        onClose={() => setProductModalOpen(false)}
+        onAddToCart={(product, flavor, qty) => {
+          addToCart(product, qty, flavor);
+          setToast(`${qty}x ${product.name} (${flavor}) adicionado!`);
+          setTimeout(() => setToast(null), 2500);
+        }}
+      />
 
+      {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} />}
       {toast && <Toast message={toast} />}
     </div>
   );
