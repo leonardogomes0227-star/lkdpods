@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Check, Landmark, Banknote, CreditCard, MapPin, Rocket, User, X } from 'lucide-react';
+import { ArrowRight, Check, Landmark, Banknote, CreditCard, MapPin, Rocket, User, X, Map } from 'lucide-react';
 import type { CheckoutInfo, PaymentMethod } from '../types';
 import { useStore } from '../store';
 import { buildWhatsAppMessage, formatBRL } from '../utils';
@@ -18,6 +18,7 @@ const PAYMENTS: { key: PaymentMethod; label: string; icon: typeof Landmark }[] =
 
 export function CheckoutModal({ open, onClose, onDone }: Props) {
   const { cart, subtotal, discount, total, appliedCoupon, clearCart } = useStore();
+  
   const [info, setInfo] = useState<CheckoutInfo>({
     name: '',
     address: '',
@@ -26,9 +27,14 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
     reference: '',
     payment: null,
     troco: '',
+    deliveryFee: 8, // Começa cobrando R$ 8 padrão
   });
+  
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sent, setSent] = useState(false);
+
+  // É AQUI QUE A MÁGICA ACONTECE: O total final soma os produtos + a taxa de entrega
+  const finalTotal = total + info.deliveryFee;
 
   if (!open) return null;
 
@@ -53,7 +59,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
       appliedCoupon,
       subtotal,
       discount,
-      total,
+      finalTotal, 
     );
     window.open(url, '_blank');
     setSent(true);
@@ -70,6 +76,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
         reference: '',
         payment: null,
         troco: '',
+        deliveryFee: 8,
       });
       setSent(false);
       onDone();
@@ -79,16 +86,13 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
-      {/* Fundo escurecido e desfocado */}
       <div
         className="absolute inset-0 bg-ink/40 backdrop-blur-sm animate-fade-in transition-opacity"
         onClick={handleClose}
       />
       
-      {/* Container Principal Claro */}
       <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-line bg-white shadow-2xl animate-slide-up sm:rounded-3xl">
         
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4 bg-white">
           <h2 className="font-display text-lg font-bold text-ink">
             {sent ? 'Pedido Enviado' : 'Finalizar Pedido'}
@@ -123,16 +127,6 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
         ) : (
           <div className="flex-1 overflow-y-auto px-5 py-5 bg-white">
             
-            {/* Aviso de Entrega Local */}
-            <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3">
-              <Rocket className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-              <p className="text-xs text-blue-800">
-                <strong className="text-blue-900">Entrega rápida e exclusiva para nossa cidade</strong>{' '}
-                (consulte taxa local se houver). Não atendemos outras localidades.
-              </p>
-            </div>
-
-            {/* Nome */}
             <Field label="Nome Completo" icon={<User className="h-3.5 w-3.5" />} error={errors.name}>
               <input
                 value={info.name}
@@ -142,7 +136,6 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               />
             </Field>
 
-            {/* Endereço */}
             <div className="mb-4">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
                 <MapPin className="h-3.5 w-3.5" /> Endereço Completo
@@ -183,7 +176,37 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               </div>
             </div>
 
-            {/* Pagamento */}
+            {/* SELEÇÃO DA TAXA DE ENTREGA */}
+            <div className="mb-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
+                <Map className="h-3.5 w-3.5" /> Taxa de Entrega
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setInfo({ ...info, deliveryFee: 8 })}
+                  className={`flex flex-col items-start justify-center rounded-xl border px-3 py-3 transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
+                    info.deliveryFee === 8
+                      ? 'border-accent bg-accentSoft text-ink shadow-sm'
+                      : 'border-line bg-white text-inkSoft hover:border-accent/40 hover:bg-bgAlt'
+                  }`}
+                >
+                  <span className="text-xs font-bold">Dentro da Cidade</span>
+                  <span className="text-[11px] font-semibold text-accent">+ R$ 8,00</span>
+                </button>
+                <button
+                  onClick={() => setInfo({ ...info, deliveryFee: 15 })}
+                  className={`flex flex-col items-start justify-center rounded-xl border px-3 py-3 transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
+                    info.deliveryFee === 15
+                      ? 'border-accent bg-accentSoft text-ink shadow-sm'
+                      : 'border-line bg-white text-inkSoft hover:border-accent/40 hover:bg-bgAlt'
+                  }`}
+                >
+                  <span className="text-xs font-bold">Bairros Longes/Fora</span>
+                  <span className="text-[11px] font-semibold text-accent">+ R$ 15,00</span>
+                </button>
+              </div>
+            </div>
+
             <div className="mb-4">
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-inkSoft">
                 Forma de Pagamento
@@ -211,7 +234,6 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               {errors.payment && <p className="mt-1 text-xs text-red-500">{errors.payment}</p>}
             </div>
 
-            {/* Troco */}
             {info.payment === 'Dinheiro' && (
               <div className="mb-4 animate-slide-up">
                 <p className="mb-2 text-xs font-bold uppercase tracking-wide text-inkSoft">
@@ -226,8 +248,8 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               </div>
             )}
 
-            {/* Resumo do Pedido */}
-            <div className="rounded-xl border border-line bg-bg p-4 mt-2">
+            {/* RESUMO DO PEDIDO COM A TAXA SOMADA */}
+            <div className="rounded-xl border border-line bg-bgAlt p-4 mt-2">
               <p className="mb-3 text-xs font-bold uppercase tracking-wide text-inkSoft">
                 Resumo do Pedido
               </p>
@@ -238,7 +260,6 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
                       <span className="font-semibold block">
                         {item.quantity}x {item.product.brand} {item.product.name}
                       </span>
-                      {/* Aqui mostramos o sabor escolhido! */}
                       <span className="text-xs text-inkSoft">Sabor: {item.selectedFlavor}</span>
                     </div>
                     <span className="shrink-0 font-medium">{formatBRL(item.product.price * item.quantity)}</span>
@@ -249,20 +270,26 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
                   <span>Subtotal</span>
                   <span className="font-medium text-ink">{formatBRL(subtotal)}</span>
                 </div>
+                
+                <div className="flex justify-between text-inkSoft">
+                  <span>Taxa de Entrega</span>
+                  <span className="font-medium text-ink">+{formatBRL(info.deliveryFee)}</span>
+                </div>
+
                 {appliedCoupon && discount > 0 && (
                   <div className="flex justify-between text-green-600 font-medium">
-                    <span>Cupom {appliedCoupon.code} ({appliedCoupon.discountPercent}%)</span>
+                    <span>Cupom {appliedCoupon.code}</span>
                     <span>-{formatBRL(discount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-display text-lg font-bold text-ink pt-1">
+                
+                <div className="flex justify-between font-display text-lg font-bold text-ink pt-2">
                   <span>Total</span>
-                  <span className="text-accent">{formatBRL(total)}</span>
+                  <span className="text-accent">{formatBRL(finalTotal)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Botão Enviar */}
             <button
               onClick={handleSubmit}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-4 text-base font-bold text-white transition-all duration-300 hover:scale-[1.02] hover:bg-ink/90 active:scale-95 shadow-xl shadow-ink/10"
@@ -277,9 +304,8 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
   );
 }
 
-// Função de estilo dos inputs atualizada para o tema claro
 function inputCls(error?: string): string {
-  return `w-full rounded-xl border bg-bg px-4 py-3 text-sm text-ink placeholder-inkSoft/50 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent ${
+  return `w-full rounded-xl border bg-white px-4 py-3 text-sm text-ink placeholder-inkSoft/50 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent ${
     error ? 'border-red-500' : 'border-line'
   }`;
 }
