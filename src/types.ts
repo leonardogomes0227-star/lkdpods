@@ -13,6 +13,7 @@ export interface Product {
   views: number;
   emoji: string;
   gradient: string;
+  image?: string; // <--- AGORA O PRODUTO ACEITA FOTO REAL!
   featured?: boolean;
 }
 
@@ -39,7 +40,7 @@ export interface CheckoutInfo {
   reference: string;
   payment: PaymentMethod | null;
   troco: string;
-  deliveryFee: number; // <- AGORA SIM! A taxa de entrega está aqui
+  deliveryFee: number;
 }
 
 export interface AdminUser {
