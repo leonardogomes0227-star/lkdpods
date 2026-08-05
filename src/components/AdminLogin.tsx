@@ -10,12 +10,17 @@ export function AdminLogin({ onClose }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const login = useStore((s) => s.login);
+  
+  // Aqui está a correção principal! Puxando a função do jeito certo:
+  const { login } = useStore();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === 'admin@lkdimports.com' && password === 'admin123') {
-      login();
+    
+    // Passando o email e senha para o store validar
+    const success = login(email, password);
+    
+    if (success) {
       onClose();
     } else {
       setError('Credenciais inválidas.');
@@ -24,13 +29,11 @@ export function AdminLogin({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Fundo escurecido para dar destaque ao modal */}
       <div
         className="absolute inset-0 bg-ink/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
-      {/* Modal Clean e Claro */}
       <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white p-8 shadow-2xl animate-slide-up">
         
         <button
