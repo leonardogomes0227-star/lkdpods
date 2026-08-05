@@ -13,11 +13,16 @@ export function ProductCard({ product, onAdd }: Props) {
       onClick={() => onAdd(product)} 
       className="group relative flex cursor-pointer flex-col overflow-hidden rounded-3xl border border-line bg-white p-4 transition-all hover:-translate-y-1 hover:shadow-xl"
     >
-      {/* Imagem / Gradient do Card */}
-      <div className={`relative mb-4 flex h-48 items-center justify-center rounded-2xl bg-gradient-to-br ${product.gradient} transition-transform duration-500 group-hover:scale-[1.02]`}>
-        <span className="text-6xl drop-shadow-lg transition-transform duration-500 group-hover:scale-110">
-          {product.emoji}
-        </span>
+      {/* Imagem Real ou Gradient com Emoji */}
+      <div className={`relative mb-4 flex h-48 items-center justify-center rounded-2xl bg-gradient-to-br ${product.gradient} overflow-hidden transition-transform duration-500 group-hover:scale-[1.02]`}>
+        
+        {product.image ? (
+          <img src={product.image} alt={product.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
+        ) : (
+          <span className="text-6xl drop-shadow-lg transition-transform duration-500 group-hover:scale-110">
+            {product.emoji}
+          </span>
+        )}
         
         {product.stock <= 5 && product.stock > 0 && (
           <span className="absolute left-3 top-3 rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase text-red-600 shadow-sm">
@@ -31,12 +36,10 @@ export function ProductCard({ product, onAdd }: Props) {
         )}
       </div>
 
-      {/* Infos */}
       <div className="flex flex-1 flex-col">
         <span className="mb-1 text-xs font-bold uppercase tracking-wider text-inkSoft">{product.brand}</span>
         <h3 className="font-display text-lg font-bold leading-tight text-ink">{product.name}</h3>
         
-        {/* Mostra os sabores como prévia */}
         <p className="mt-1 line-clamp-1 text-xs font-medium text-inkSoft">
           {product.flavor.split(',').join(' • ')}
         </p>
