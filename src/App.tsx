@@ -34,7 +34,8 @@ function Footer() {
           <Reveal>
             <div>
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-neon-500 font-display text-lg font-bold text-black shadow-[0_0_20px_-4px_rgba(57,255,20,0.5)]">
+                {/* Ícone limpo, sem neon e sem brilho verde radioativo */}
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink-850 border border-ink-700 font-display text-lg font-bold text-white">
                   L
                 </div>
                 <p className="font-display text-lg font-bold text-white">
