@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Boxes,
+  Calendar,
   DollarSign,
   LogOut,
   Package,
@@ -34,6 +35,9 @@ export function AdminDashboard({ onExit }: Props) {
     deleteCoupon,
     logout,
     resetFlash,
+    dailyTotal,   // <-- PUXANDO O TOTAL DO DIA
+    weeklyTotal,  // <-- PUXANDO O TOTAL DA SEMANA
+    monthlyTotal, // <-- PUXANDO O TOTAL DO MÊS
   } = useStore();
 
   const [tab, setTab] = useState<Tab>('produtos');
@@ -122,38 +126,61 @@ export function AdminDashboard({ onExit }: Props) {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        {/* Metrics */}
+        
+        {/* NOVA SEÇÃO DE FECHAMENTO FINANCEIRO - AGORA COM DADOS REAIS! */}
+        <div className="mb-6">
+          <h2 className="mb-4 font-display text-lg font-bold text-ink">Visão Geral (Fechamento)</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            
+            <div className="rounded-2xl border border-line bg-white p-5 shadow-sm transition-transform hover:-translate-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-inkSoft">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                    <DollarSign className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-wider">Fechamento do Dia</p>
+                </div>
+              </div>
+              <p className="mt-4 font-display text-3xl font-bold text-ink">{formatBRL(dailyTotal)}</p>
+              <p className="mt-1 text-xs text-inkSoft">Hoje</p>
+            </div>
+
+            <div className="rounded-2xl border border-line bg-white p-5 shadow-sm transition-transform hover:-translate-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-inkSoft">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                    <TrendingUp className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-wider">Esta Semana</p>
+                </div>
+              </div>
+              <p className="mt-4 font-display text-3xl font-bold text-ink">{formatBRL(weeklyTotal)}</p>
+              <p className="mt-1 text-xs text-inkSoft">Últimos 7 dias</p>
+            </div>
+
+            <div className="rounded-2xl border border-line bg-white p-5 shadow-sm transition-transform hover:-translate-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-inkSoft">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-50 text-purple-600">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-wider">Neste Mês</p>
+                </div>
+              </div>
+              <p className="mt-4 font-display text-3xl font-bold text-ink">{formatBRL(monthlyTotal)}</p>
+              <p className="mt-1 text-xs text-inkSoft">Mês Atual</p>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Metrics do Estoque */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-          <MetricCard
-            icon={<Package className="h-5 w-5" />}
-            label="Produtos"
-            value={String(metrics.totalProducts)}
-            accent="neon"
-          />
-          <MetricCard
-            icon={<DollarSign className="h-5 w-5" />}
-            label="Valor em estoque"
-            value={formatBRL(metrics.stockValue)}
-            accent="electric"
-          />
-          <MetricCard
-            icon={<TrendingUp className="h-5 w-5" />}
-            label="Custo do estoque"
-            value={formatBRL(metrics.costValue)}
-            accent="neon"
-          />
-          <MetricCard
-            icon={<Tag className="h-5 w-5" />}
-            label="Cupons ativos"
-            value={String(metrics.activeCoupons)}
-            accent="electric"
-          />
-          <MetricCard
-            icon={<Boxes className="h-5 w-5" />}
-            label="Estoque crítico"
-            value={String(metrics.lowStock)}
-            accent="danger"
-          />
+          <MetricCard icon={<Package className="h-5 w-5" />} label="Produtos" value={String(metrics.totalProducts)} accent="neon" />
+          <MetricCard icon={<DollarSign className="h-5 w-5" />} label="Valor em estoque" value={formatBRL(metrics.stockValue)} accent="electric" />
+          <MetricCard icon={<TrendingUp className="h-5 w-5" />} label="Custo do estoque" value={formatBRL(metrics.costValue)} accent="neon" />
+          <MetricCard icon={<Tag className="h-5 w-5" />} label="Cupons ativos" value={String(metrics.activeCoupons)} accent="electric" />
+          <MetricCard icon={<Boxes className="h-5 w-5" />} label="Estoque crítico" value={String(metrics.lowStock)} accent="danger" />
         </div>
 
         {/* Flash reset */}
@@ -164,10 +191,7 @@ export function AdminDashboard({ onExit }: Props) {
               Reinicie o contador da Promoção Relâmpago na vitrine.
             </p>
           </div>
-          <button
-            onClick={resetFlash}
-            className="rounded-lg bg-red-50 px-4 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
-          >
+          <button onClick={resetFlash} className="rounded-lg bg-red-50 px-4 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100">
             Reiniciar contador
           </button>
         </div>
@@ -220,15 +244,10 @@ export function AdminDashboard({ onExit }: Props) {
                   </thead>
                   <tbody>
                     {filtered.map((p) => (
-                      <tr
-                        key={p.id}
-                        className="border-b border-line transition hover:bg-bgAlt/50"
-                      >
+                      <tr key={p.id} className="border-b border-line transition hover:bg-bgAlt/50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div
-                              className={`flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${p.gradient} text-xl shadow-sm`}
-                            >
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${p.gradient} text-xl shadow-sm`}>
                               {p.emoji}
                             </div>
                             <div>
@@ -241,30 +260,16 @@ export function AdminDashboard({ onExit }: Props) {
                         <td className="px-4 py-3 font-semibold text-ink">{formatBRL(p.price)}</td>
                         <td className="px-4 py-3 text-inkSoft">{formatBRL(p.cost)}</td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                              p.stock === 0
-                                ? 'bg-gray-100 text-gray-500'
-                                : p.stock <= 5
-                                  ? 'bg-red-50 text-red-600'
-                                  : 'bg-green-50 text-green-600'
-                            }`}
-                          >
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${p.stock === 0 ? 'bg-gray-100 text-gray-500' : p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
                             {p.stock} un.
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleEdit(p)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-accent hover:text-accent hover:bg-accentSoft"
-                            >
+                            <button onClick={() => handleEdit(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-accent hover:text-accent hover:bg-accentSoft">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
-                            <button
-                              onClick={() => setConfirmDelete(p)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-red-200 hover:text-red-500 hover:bg-red-50"
-                            >
+                            <button onClick={() => setConfirmDelete(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-red-200 hover:text-red-500 hover:bg-red-50">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
@@ -273,18 +278,14 @@ export function AdminDashboard({ onExit }: Props) {
                     ))}
                   </tbody>
                 </table>
-                {filtered.length === 0 && (
-                  <p className="py-12 text-center text-inkSoft">Nenhum produto encontrado.</p>
-                )}
+                {filtered.length === 0 && <p className="py-12 text-center text-inkSoft">Nenhum produto encontrado.</p>}
               </div>
 
               {/* Mobile cards */}
               <div className="divide-y divide-line md:hidden">
                 {filtered.map((p) => (
                   <div key={p.id} className="flex items-center gap-3 p-4 hover:bg-bgAlt/50 transition">
-                    <div
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${p.gradient} text-2xl shadow-sm`}
-                    >
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${p.gradient} text-2xl shadow-sm`}>
                       {p.emoji}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -292,38 +293,22 @@ export function AdminDashboard({ onExit }: Props) {
                       <p className="truncate text-xs text-inkSoft">{p.flavor} · {p.category}</p>
                       <div className="mt-1 flex items-center gap-2">
                         <span className="text-sm font-bold text-accent">{formatBRL(p.price)}</span>
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                            p.stock === 0
-                              ? 'bg-gray-100 text-gray-500'
-                              : p.stock <= 5
-                                ? 'bg-red-50 text-red-600'
-                                : 'bg-green-50 text-green-600'
-                          }`}
-                        >
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${p.stock === 0 ? 'bg-gray-100 text-gray-500' : p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
                           {p.stock} un.
                         </span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => handleEdit(p)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:bg-accentSoft hover:text-accent"
-                      >
+                      <button onClick={() => handleEdit(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:bg-accentSoft hover:text-accent">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button
-                        onClick={() => setConfirmDelete(p)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:bg-red-50 hover:text-red-500"
-                      >
+                      <button onClick={() => setConfirmDelete(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:bg-red-50 hover:text-red-500">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
                 ))}
-                {filtered.length === 0 && (
-                  <p className="py-12 text-center text-inkSoft">Nenhum produto encontrado.</p>
-                )}
+                {filtered.length === 0 && <p className="py-12 text-center text-inkSoft">Nenhum produto encontrado.</p>}
               </div>
             </div>
           </div>
@@ -346,17 +331,12 @@ export function AdminDashboard({ onExit }: Props) {
                   placeholder="% desconto"
                   className="w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-sm text-ink placeholder-inkSoft/60 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent sm:w-32"
                 />
-                <button
-                  onClick={handleAddCoupon}
-                  className="rounded-xl bg-ink px-5 py-2.5 text-sm font-bold text-white transition hover:bg-ink/90 active:scale-95"
-                >
+                <button onClick={handleAddCoupon} className="rounded-xl bg-ink px-5 py-2.5 text-sm font-bold text-white transition hover:bg-ink/90 active:scale-95">
                   Criar Cupom
                 </button>
               </div>
               {couponMsg && (
-                <p
-                  className={`mt-2 text-xs font-medium ${couponMsg.ok ? 'text-green-600' : 'text-red-500'}`}
-                >
+                <p className={`mt-2 text-xs font-medium ${couponMsg.ok ? 'text-green-600' : 'text-red-500'}`}>
                   {couponMsg.message}
                 </p>
               )}
@@ -376,46 +356,26 @@ export function AdminDashboard({ onExit }: Props) {
                 <tbody>
                   {coupons.map((c) => (
                     <tr key={c.id} className="border-b border-line transition hover:bg-bgAlt/50">
-                      <td className="px-4 py-3">
-                        <span className="font-display font-bold text-accent">{c.code}</span>
-                      </td>
+                      <td className="px-4 py-3"><span className="font-display font-bold text-accent">{c.code}</span></td>
                       <td className="px-4 py-3 font-semibold text-ink">{c.discountPercent}%</td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                            c.active
-                              ? 'bg-green-50 text-green-600'
-                              : 'bg-gray-100 text-gray-500'
-                          }`}
-                        >
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${c.active ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
                           {c.active ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => toggleCoupon(c.id)}
-                            className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-inkSoft transition hover:border-accent hover:bg-accentSoft hover:text-accent"
-                          >
+                          <button onClick={() => toggleCoupon(c.id)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-inkSoft transition hover:border-accent hover:bg-accentSoft hover:text-accent">
                             {c.active ? 'Desativar' : 'Ativar'}
                           </button>
-                          <button
-                            onClick={() => deleteCoupon(c.id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                          >
+                          <button onClick={() => deleteCoupon(c.id)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-red-200 hover:bg-red-50 hover:text-red-500">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </td>
                     </tr>
                   ))}
-                  {coupons.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-12 text-center text-inkSoft">
-                        Nenhum cupom cadastrado.
-                      </td>
-                    </tr>
-                  )}
+                  {coupons.length === 0 && <tr><td colSpan={4} className="py-12 text-center text-inkSoft">Nenhum cupom cadastrado.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -423,20 +383,11 @@ export function AdminDashboard({ onExit }: Props) {
         )}
       </div>
 
-      {/* Product form modal */}
-      <ProductForm
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        editing={editing}
-      />
+      <ProductForm open={formOpen} onClose={() => setFormOpen(false)} editing={editing} />
 
-      {/* Delete confirm */}
       {confirmDelete && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
-            onClick={() => setConfirmDelete(null)}
-          />
+          <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} />
           <div className="relative w-full max-w-sm animate-scale-in rounded-3xl border border-line bg-white p-6 text-center shadow-2xl">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
               <Trash2 className="h-6 w-6 text-red-500" />
@@ -446,10 +397,7 @@ export function AdminDashboard({ onExit }: Props) {
               <strong className="text-ink">{confirmDelete.brand} {confirmDelete.name}</strong> será removido da vitrine e do estoque.
             </p>
             <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-xl border border-line bg-bg py-2.5 text-sm font-semibold text-inkSoft transition hover:bg-bgAlt hover:text-ink"
-              >
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-xl border border-line bg-bg py-2.5 text-sm font-semibold text-inkSoft transition hover:bg-bgAlt hover:text-ink">
                 Cancelar
               </button>
               <button
@@ -469,17 +417,7 @@ export function AdminDashboard({ onExit }: Props) {
   );
 }
 
-function MetricCard({
-  icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  accent: 'neon' | 'electric' | 'danger';
-}) {
+function MetricCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent: 'neon' | 'electric' | 'danger' }) {
   const colors = {
     neon: 'text-accent bg-accentSoft border-accent/20',
     electric: 'text-blue-600 bg-blue-50 border-blue-200',
@@ -496,22 +434,12 @@ function MetricCard({
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
       className={`flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-all active:scale-95 ${
-        active
-          ? 'bg-ink text-white shadow-md'
-          : 'border border-line bg-white text-inkSoft hover:border-accent/40 hover:bg-bgAlt hover:text-ink'
+        active ? 'bg-ink text-white shadow-md' : 'border border-line bg-white text-inkSoft hover:border-accent/40 hover:bg-bgAlt hover:text-ink'
       }`}
     >
       {children}
