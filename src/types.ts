@@ -6,7 +6,7 @@ export interface Product {
   brand: string;
   category: Category;
   flavor: string;
-  description: string;
+  description?: string; // Adicionado para suportar a descrição do painel
   price: number;
   cost: number;
   stock: number;
@@ -26,6 +26,7 @@ export interface Coupon {
 export interface CartItem {
   product: Product;
   quantity: number;
+  selectedFlavor: string; // O carrinho agora sabe qual foi o sabor escolhido
 }
 
 export type PaymentMethod = 'PIX' | 'Cartão' | 'Dinheiro';
