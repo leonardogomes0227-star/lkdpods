@@ -1,4 +1,4 @@
-vimport { create } from 'zustand';
+import { create } from 'zustand';
 import { supabase } from './supabaseClient';
 import type { Product, CartItem, Sale } from './types';
 
