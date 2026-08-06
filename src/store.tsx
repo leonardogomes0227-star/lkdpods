@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from './supabaseClient'; // ou o caminho do seu cliente supabase
+import { supabase } from './supabaseClient';
 import type { Product, CartItem, Sale } from './types';
 
 interface StoreState {
@@ -11,10 +11,12 @@ interface StoreState {
   discount: number;
   total: number;
   appliedCoupon: any;
+  isAuthed: boolean;
+  flashDeadline: number;
   addToCart: (product: Product, qty?: number, flavor?: string) => boolean;
   recordSale: (amount: number, customerInfo?: { name: string; phone: string }) => Promise<void>;
   clearCart: () => void;
-  // ... outras funções e estados do seu projeto ...
+  setAuthed: (authed: boolean) => void;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -26,8 +28,11 @@ export const useStore = create<StoreState>((set, get) => ({
   discount: 0,
   total: 0,
   appliedCoupon: null,
+  isAuthed: false,
+  flashDeadline: Date.now() + 24 * 60 * 60 * 1000,
 
-  // Cole aqui a sua função addToCart
+  setAuthed: (authed) => set({ isAuthed: authed }),
+
   addToCart: (product, qty = 1, flavor = '') => {
     if (qty <= 0) return false;
     if (!flavor) {
@@ -60,7 +65,6 @@ export const useStore = create<StoreState>((set, get) => ({
     return success;
   },
 
-  // Cole aqui a sua função recordSale
   recordSale: async (amount, customerInfo) => {
     const timestamp = Date.now();
     const tempId = Math.random().toString();
@@ -84,14 +88,6 @@ export const useStore = create<StoreState>((set, get) => ({
         .from('products')
         .update({ stock: newStock })
         .eq('id', product.id);
-
-      if (newStock === 0) {
-        await supabase.from('audit_logs').insert([{
-          action: 'OUT_OF_STOCK',
-          details: `O produto "${product.name}" (Sabor: ${item.selectedFlavor}) esgotou totalmente!`,
-          timestamp: Date.now()
-        }]);
-      }
     }
 
     if (customerInfo && customerInfo.phone) {
