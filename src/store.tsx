@@ -13,6 +13,7 @@ interface StoreState {
   appliedCoupon: any;
   isAuthed: boolean;
   flashDeadline: number;
+  setProducts: (products: Product[]) => void;
   addToCart: (product: Product, qty?: number, flavor?: string) => boolean;
   recordSale: (amount: number, customerInfo?: { name: string; phone: string }) => Promise<void>;
   clearCart: () => void;
@@ -31,6 +32,7 @@ export const useStore = create<StoreState>((set, get) => ({
   isAuthed: false,
   flashDeadline: Date.now() + 24 * 60 * 60 * 1000,
 
+  setProducts: (products) => set({ products: products || [] }),
   setAuthed: (authed) => set({ isAuthed: authed }),
 
   addToCart: (product, qty = 1, flavor = '') => {
@@ -42,7 +44,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     let success = false;
     set((state) => {
-      const prev = state.cart;
+      const prev = state.cart || [];
       const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
       const currentQtyInCart = existing ? existing.quantity : 0;
       const requestedTotal = currentQtyInCart + qty;
@@ -59,7 +61,7 @@ export const useStore = create<StoreState>((set, get) => ({
         cart: newCart,
         cartCount: newCount,
         subtotal: newSubtotal,
-        total: newSubtotal - state.discount,
+        total: newSubtotal - (state.discount || 0),
       };
     });
     return success;
@@ -70,18 +72,18 @@ export const useStore = create<StoreState>((set, get) => ({
     const tempId = Math.random().toString();
     const state = get();
     
-    set((prev) => ({ sales: [...prev.sales, { id: tempId, amount, timestamp }] }));
+    set((prev) => ({ sales: [...(prev.sales || []), { id: tempId, amount, timestamp }] }));
 
     await supabase
       .from('sales')
       .insert([{ amount, timestamp }]);
 
-    for (const item of state.cart) {
+    for (const item of (state.cart || [])) {
       const product = item.product;
       const newStock = Math.max(0, product.stock - item.quantity);
 
       set((prev) => ({
-        products: prev.products.map((p) => (p.id === product.id ? { ...p, stock: newStock } : p))
+        products: (prev.products || []).map((p) => (p.id === product.id ? { ...p, stock: newStock } : p))
       }));
 
       await supabase
