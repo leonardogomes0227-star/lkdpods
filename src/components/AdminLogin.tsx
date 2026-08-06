@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, ArrowLeft } from 'lucide-react';
-import { ADMIN_CREDENTIALS, storage } from '../store';
+import { useStore } from '../store';
 
 interface AdminLoginProps {
   onClose: () => void;
@@ -10,11 +10,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onClose }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
+  const { login } = useStore();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
-      storage.setAuthed(true);
+    const success = login(email, password);
+    if (success) {
       window.location.reload();
     } else {
       setError(true);
