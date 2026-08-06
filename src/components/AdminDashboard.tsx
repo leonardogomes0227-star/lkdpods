@@ -76,6 +76,8 @@ export function AdminDashboard({ onExit }: Props) {
     );
   }, [products, search]);
 
+  const safeCoupons = coupons ?? [];
+
   const handleEdit = (p: Product) => {
     setEditing(p);
     setFormOpen(true);
@@ -142,7 +144,7 @@ export function AdminDashboard({ onExit }: Props) {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        
+
         {/* VISÃO GERAL DE VENDAS */}
         <div className="mb-6">
           <h2 className="mb-4 font-display text-lg font-bold text-ink">Visão Geral (Fechamento)</h2>
@@ -255,3 +257,243 @@ export function AdminDashboard({ onExit }: Props) {
                       <th className="px-4 py-3 text-right font-semibold">Ações</th>
                     </tr>
                   </thead>
+                  <tbody>
+                    {filtered.map((p) => (
+                      <tr key={p.id} className="border-b border-line transition hover:bg-bgAlt/50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${p.gradient} text-xl shadow-sm`}>
+                              {p.emoji}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-semibold text-ink">{p.brand} {p.name}</p>
+                                {p.featured && (
+                                  <span className="rounded-full bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold text-amber-700">
+                                    ⭐ Destaque
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-inkSoft">{p.flavor}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-inkSoft">{p.category}</td>
+                        <td className="px-4 py-3 font-semibold text-ink">{formatBRL(p.price)}</td>
+                        <td className="px-4 py-3 text-inkSoft">{formatBRL(p.cost)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${p.stock === 0 ? 'bg-gray-100 text-gray-500' : p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                            {p.stock} un.
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Botão de Estrela (Destacar na Home) */}
+                            <button
+                              onClick={() => handleToggleFeatured(p.id)}
+                              title={p.featured ? 'Remover destaque da Home' : 'Destacar na Home'}
+                              className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                                p.featured
+                                  ? 'border-amber-300 bg-amber-50 text-amber-500'
+                                  : 'border-line text-inkSoft hover:border-amber-200 hover:text-amber-500 hover:bg-amber-50/50'
+                              }`}
+                            >
+                              <Star className={`h-3.5 w-3.5 ${p.featured ? 'fill-amber-500' : ''}`} />
+                            </button>
+
+                            <button onClick={() => handleEdit(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-accent hover:text-accent hover:bg-accentSoft">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button onClick={() => setConfirmDelete(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-red-200 hover:text-red-500 hover:bg-red-50">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filtered.length === 0 && <p className="py-12 text-center text-inkSoft">Nenhum produto encontrado.</p>}
+              </div>
+
+              {/* MOBILE CARDS */}
+              <div className="divide-y divide-line md:hidden">
+                {filtered.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 p-4 hover:bg-bgAlt/50 transition">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${p.gradient} text-2xl shadow-sm`}>
+                      {p.emoji}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate font-semibold text-ink">{p.brand} {p.name}</p>
+                        {p.featured && (
+                          <span className="rounded-full bg-amber-100 px-1 py-0.2 text-[9px] font-bold text-amber-700">
+                            ⭐
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-inkSoft">{p.flavor} · {p.category}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-sm font-bold text-accent">{formatBRL(p.price)}</span>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${p.stock === 0 ? 'bg-gray-100 text-gray-500' : p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                          {p.stock} un.
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleToggleFeatured(p.id)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                          p.featured
+                            ? 'border-amber-300 bg-amber-50 text-amber-500'
+                            : 'border-line text-inkSoft'
+                        }`}
+                      >
+                        <Star className={`h-3.5 w-3.5 ${p.featured ? 'fill-amber-500' : ''}`} />
+                      </button>
+                      <button onClick={() => handleEdit(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:bg-accentSoft hover:text-accent">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => setConfirmDelete(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:bg-red-50 hover:text-red-500">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {filtered.length === 0 && <p className="py-12 text-center text-inkSoft">Nenhum produto encontrado.</p>}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            {/* CUPONS */}
+            <div className="mb-4 rounded-2xl border border-line bg-white p-4 shadow-sm">
+              <p className="mb-3 text-sm font-semibold text-ink">Cadastrar novo cupom</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="Código (ex: VERAO15)"
+                  className="flex-1 rounded-xl border border-line bg-bg px-3 py-2.5 text-sm uppercase text-ink placeholder-inkSoft/60 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent"
+                />
+                <input
+                  value={couponPct}
+                  onChange={(e) => setCouponPct(e.target.value)}
+                  type="number"
+                  placeholder="% desconto"
+                  className="w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-sm text-ink placeholder-inkSoft/60 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent sm:w-32"
+                />
+                <button onClick={handleAddCoupon} className="rounded-xl bg-ink px-5 py-2.5 text-sm font-bold text-white transition hover:bg-ink/90 active:scale-95">
+                  Criar Cupom
+                </button>
+              </div>
+              {couponMsg && (
+                <p className={`mt-2 text-xs font-medium ${couponMsg.ok ? 'text-green-600' : 'text-red-500'}`}>
+                  {couponMsg.message}
+                </p>
+              )}
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-line bg-bgAlt text-xs uppercase tracking-wide text-inkSoft">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Código</th>
+                    <th className="px-4 py-3 font-semibold">Desconto</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 text-right font-semibold">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {safeCoupons.map((c) => (
+                    <tr key={c.id} className="border-b border-line transition hover:bg-bgAlt/50">
+                      <td className="px-4 py-3"><span className="font-display font-bold text-accent">{c.code}</span></td>
+                      <td className="px-4 py-3 font-semibold text-ink">{c.discountPercent}%</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${c.active ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                          {c.active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => toggleCoupon(c.id)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-inkSoft transition hover:border-accent hover:bg-accentSoft hover:text-accent">
+                            {c.active ? 'Desativar' : 'Ativar'}
+                          </button>
+                          <button onClick={() => deleteCoupon(c.id)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-red-200 hover:bg-red-50 hover:text-red-500">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {safeCoupons.length === 0 && <tr><td colSpan={4} className="py-12 text-center text-inkSoft">Nenhum cupom cadastrado.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ProductForm open={formOpen} onClose={() => setFormOpen(false)} editing={editing} />
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} />
+          <div className="relative w-full max-w-sm animate-scale-in rounded-3xl border border-line bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+              <Trash2 className="h-6 w-6 text-red-500" />
+            </div>
+            <h3 className="font-display text-lg font-bold text-ink">Excluir produto?</h3>
+            <p className="mt-1 text-sm text-inkSoft">
+              <strong className="text-ink">{confirmDelete.brand} {confirmDelete.name}</strong> será removido da vitrine e do estoque.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-xl border border-line bg-bg py-2.5 text-sm font-semibold text-inkSoft transition hover:bg-bgAlt hover:text-ink">
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  deleteProduct(confirmDelete.id);
+                  setConfirmDelete(null);
+                }}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-bold text-white transition hover:bg-red-600 active:scale-95"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MetricCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent: 'neon' | 'electric' | 'danger' }) {
+  const colors = {
+    neon: 'text-accent bg-accentSoft border-accent/20',
+    electric: 'text-blue-600 bg-blue-50 border-blue-200',
+    danger: 'text-red-500 bg-red-50 border-red-200',
+  };
+  return (
+    <div className="rounded-2xl border border-line bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+      <div className={`mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg border ${colors[accent]}`}>
+        {icon}
+      </div>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-inkSoft">{label}</p>
+      <p className="mt-1 font-display text-lg font-bold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-all active:scale-95 ${
+        active ? 'bg-ink text-white shadow-md' : 'border border-line bg-white text-inkSoft hover:border-accent/40 hover:bg-bgAlt hover:text-ink'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
