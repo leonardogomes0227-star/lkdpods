@@ -5,16 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npx vite build --emptyOutDir",
+    "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/functions-js": "^2.4.3",
-    "@supabase/postgrest-js": "^1.15.7",
-    "@supabase/realtime-js": "^2.10.4",
-    "@supabase/storage-js": "^2.7.1",
     "@supabase/supabase-js": "^2.57.4",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
