@@ -20,17 +20,13 @@ interface Props {
 
 export function ProductGrid({ onAdd, query }: Props) {
   const storeProducts = useStore((state) => state.products);
-  
-  // Garantia absoluta para nunca quebrar no .filter()
   const products = Array.isArray(storeProducts) ? storeProducts : [];
 
   const [cat, setCat] = useState<Category | 'Todos'>('Todos');
   const [sort, setSort] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
 
   const filtered = useMemo(() => {
-    if (!Array.isArray(products)) return [];
-
-    let list = products.filter((p) => {
+    const list = Array.isArray(products) ? products.filter((p) => {
       if (!p) return false;
       const matchesCat = cat === 'Todos' || p.category === cat;
       const q = (query ?? '').trim().toLowerCase();
@@ -40,15 +36,17 @@ export function ProductGrid({ onAdd, query }: Props) {
         (p.brand ?? '').toLowerCase().includes(q) ||
         (p.flavor ?? '').toLowerCase().includes(q);
       return matchesCat && matchesQuery;
-    });
+    }) : [];
 
-    if (sort === 'price-asc') list = [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
-    if (sort === 'price-desc') list = [...list].sort((a, b) => (b.price || 0) - (a.price || 0));
-    if (sort === 'featured')
-      list = [...list].sort(
+    const sortedList = [...list];
+    if (sort === 'price-asc') sortedList.sort((a, b) => (a.price || 0) - (b.price || 0));
+    if (sort === 'price-desc') sortedList.sort((a, b) => (b.price || 0) - (a.price || 0));
+    if (sort === 'featured') {
+      sortedList.sort(
         (a, b) => Number(!!b.featured) - Number(!!a.featured) || (b.views || 0) - (a.views || 0),
       );
-    return list;
+    }
+    return sortedList;
   }, [products, query, cat, sort]);
 
   return (
