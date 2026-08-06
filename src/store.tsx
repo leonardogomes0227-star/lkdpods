@@ -9,12 +9,17 @@ import {
 } from 'react';
 import type { CartItem, Coupon, Product } from './types';
 import { storage } from './storage';
-import { supabase } from './supabase'; // <-- NOSSA CONEXÃO COM A NUVEM AQUI!
+import { supabase } from './supabase';
+import { logSecurityEvent } from './security';
 
 export const ADMIN_CREDENTIALS = {
   email: 'admin@lkdimports.com',
   password: 'admin123',
 };
+
+// Variáveis de controle de tentativa de força bruta (Rate Limiting)
+let failedLoginAttempts = 0;
+let lockoutUntil = 0;
 
 export interface Sale {
   id: string;
@@ -55,7 +60,7 @@ interface StoreContextValue {
   toggleCoupon: (id: string) => void;
   deleteCoupon: (id: string) => void;
   
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   resetFlash: () => void;
 }
@@ -63,7 +68,6 @@ interface StoreContextValue {
 const StoreContext = createContext<StoreContextValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  // Começamos com as listas vazias enquanto o Supabase baixa tudo
   const [products, setProducts] = useState<Product[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -73,27 +77,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [isAuthed, setIsAuthed] = useState<boolean>(() => storage.isAuthed());
   const [flashDeadline, setFlashDeadline] = useState<number>(() => storage.getFlashDeadline());
 
-  // === MAGIA DA NUVEM: BAIXANDO OS DADOS AO ABRIR O SITE ===
   useEffect(() => {
     async function loadDataFromCloud() {
-      // 1. Baixa os produtos
       const { data: pData } = await supabase.from('products').select('*');
       if (pData) setProducts(pData);
 
-      // 2. Baixa os cupons (traduzindo o nome da coluna do banco para o código)
       const { data: cData } = await supabase.from('coupons').select('*');
       if (cData) {
         setCoupons(
           cData.map((c) => ({
             id: c.id,
             code: c.code,
-            discountPercent: c.discount_percent, // Tradução mágica aqui
+            discountPercent: c.discount_percent,
             active: c.active,
           }))
         );
       }
 
-      // 3. Baixa o histórico de vendas para o fechamento
       const { data: sData } = await supabase.from('sales').select('*');
       if (sData) setSales(sData);
     }
@@ -101,7 +101,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     loadDataFromCloud();
   }, []);
 
-  // === CÁLCULO DE FECHAMENTO (Agora roda com os dados da nuvem) ===
   const { dailyTotal, weeklyTotal, monthlyTotal } = useMemo(() => {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -121,11 +120,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { dailyTotal: daily, weeklyTotal: weekly, monthlyTotal: monthly };
   }, [sales]);
 
-  // === MUTAÇÕES NO BANCO DE DADOS ===
-
   const recordSale = useCallback((amount: number) => {
     const timestamp = Date.now();
-    const tempId = Math.random().toString(); // ID temporário pra tela atualizar na hora
+    const tempId = Math.random().toString();
     
     setSales((prev) => [...prev, { id: tempId, amount, timestamp }]);
 
@@ -139,50 +136,53 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  const addProduct = useCallback((p: Omit<Product, 'id' | 'views'>) => {
+  const addProduct = useCallback(async (p: Omit<Product, 'id' | 'views'>) => {
     supabase
       .from('products')
       .insert([{ ...p, views: Math.floor(Math.random() * 8) + 1, featured: false }])
       .select()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
           console.error('Erro detalhado do Supabase ao cadastrar:', error);
           alert('Erro ao salvar no banco: ' + error.message);
         } else if (data && data.length > 0) {
           setProducts((prev) => [data[0], ...prev]);
+          await logSecurityEvent('PRODUCT_CREATED', `Produto criado: ${p.name} (Marca: ${p.brand})`);
         }
       });
   }, []);
 
   const updateProduct = useCallback((id: string, patch: Partial<Product>) => {
-    // Atualiza a tela primeiro (UI Otimista)
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-    // Manda pro banco no fundo
     supabase.from('products').update(patch).eq('id', id);
   }, []);
 
-  const deleteProduct = useCallback((id: string) => {
+  const deleteProduct = useCallback(async (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
     supabase.from('products').delete().eq('id', id);
+    await logSecurityEvent('PRODUCT_DELETED', `Produto removido ID: ${id}`);
   }, []);
 
-  const addCoupon = useCallback((code: string, discountPercent: number) => {
+  const addCoupon = useCallback(async (code: string, discountPercent: number) => {
     const exists = coupons.some((c) => c.code.toUpperCase() === code.trim().toUpperCase());
     if (exists) return { ok: false, message: 'Já existe um cupom com esse código.' };
     if (discountPercent <= 0 || discountPercent > 100)
       return { ok: false, message: 'Desconto deve ser entre 1% e 100%.' };
 
+    const formattedCode = code.trim().toUpperCase();
+
     supabase
       .from('coupons')
-      .insert([{ code: code.trim().toUpperCase(), discount_percent: discountPercent, active: true }])
+      .insert([{ code: formattedCode, discount_percent: discountPercent, active: true }])
       .select()
       .single()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (data) {
           setCoupons((prev) => [
             ...prev,
             { id: data.id, code: data.code, discountPercent: data.discount_percent, active: data.active },
           ]);
+          await logSecurityEvent('COUPON_CREATED', `Cupom criado: ${formattedCode} (${discountPercent}%)`);
         }
       });
       
@@ -204,8 +204,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setCoupons((prev) => prev.filter((c) => c.id !== id));
     supabase.from('coupons').delete().eq('id', id);
   }, []);
-
-  // === LÓGICA DO CARRINHO E COMPRAS ===
 
   const addToCart = useCallback((product: Product, qty = 1, flavor = '') => {
     setCart((prev) => {
@@ -261,13 +259,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const removeCoupon = useCallback(() => setCouponCode(null), []);
 
-  const login = useCallback((email: string, password: string) => {
+  // === LOGIN BLINDADO COM RATE LIMITING E AUDITORIA ===
+  const login = useCallback(async (email: string, password: string) => {
+    const now = Date.now();
+    
+    if (now < lockoutUntil) {
+      const waitSeconds = Math.ceil((lockoutUntil - now) / 1000);
+      alert(`Muitas tentativas incorretas. Aguarde ${waitSeconds} segundos para tentar novamente.`);
+      return false;
+    }
+
     if (email.trim().toLowerCase() === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+      failedLoginAttempts = 0;
+      lockoutUntil = 0;
+
       storage.setAuthed(true);
       setIsAuthed(true);
+
+      await logSecurityEvent('ADMIN_LOGIN_SUCCESS', `Login bem-sucedido com o e-mail: ${email}`);
       return true;
+    } else {
+      failedLoginAttempts += 1;
+
+      if (failedLoginAttempts >= 5) {
+        lockoutUntil = Date.now() + 30 * 1000;
+        failedLoginAttempts = 0;
+        await logSecurityEvent('ADMIN_LOCKOUT', 'Painel bloqueado temporariamente por excesso de tentativas de login falhas.');
+      } else {
+        await logSecurityEvent('ADMIN_LOGIN_FAILED', `Tentativa de login falha com o e-mail: ${email} (Tentativa ${failedLoginAttempts}/5)`);
+      }
+
+      return false;
     }
-    return false;
   }, []);
 
   const logout = useCallback(() => {
