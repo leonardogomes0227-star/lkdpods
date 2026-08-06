@@ -1,352 +1,181 @@
-import { useState } from 'react';
-import { ArrowRight, Check, Landmark, Banknote, CreditCard, MapPin, User, X, Map, Phone } from 'lucide-react';
-import type { CheckoutInfo, PaymentMethod } from '../types';
-import { useStore } from '../store';
-import { buildWhatsAppMessage, formatBRL } from '../utils';
+import { useState, useEffect } from 'react';
+import { X, ShoppingBag, FileText, Droplets, Minus, Plus } from 'lucide-react';
+import type { Product } from '../types';
+import { formatBRL } from '../utils';
+import { trackFunnelEvent } from '../utils/funnelTracker';
 
 interface Props {
-  open: boolean;
+  product: Product | null;
+  isOpen: boolean;
   onClose: () => void;
-  onDone: () => void;
+  onAddToCart: (product: Product, selectedFlavor: string, quantity: number) => void;
 }
 
-const PAYMENTS: { key: PaymentMethod; label: string; icon: typeof Landmark }[] = [
-  { key: 'PIX', label: 'PIX', icon: Landmark },
-  { key: 'Cartão', label: 'Cartão', icon: CreditCard },
-  { key: 'Dinheiro', label: 'Dinheiro', icon: Banknote },
-];
+export function ProductModal({ product, isOpen, onClose, onAddToCart }: Props) {
+  const [selectedFlavor, setSelectedFlavor] = useState<string>('');
+  const [quantity, setQuantity] = useState(1);
 
-export function CheckoutModal({ open, onClose, onDone }: Props) {
-  const { cart, subtotal, discount, total, appliedCoupon, clearCart, recordSale } = useStore();
-  
-  const [info, setInfo] = useState<CheckoutInfo>({
-    name: '',
-    phone: '',
-    address: '',
-    number: '',
-    district: '',
-    reference: '',
-    payment: null,
-    troco: '',
-    deliveryFee: 8,
-  });
-  
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [sent, setSent] = useState(false);
+  const flavors = Array.isArray(product?.flavors) && product!.flavors.length > 0
+    ? product!.flavors
+    : [{ name: 'Padrão', stock: 999 }];
 
-  const finalTotal = total + info.deliveryFee;
+  const selectedFlavorStock = flavors.find((f) => f.name === selectedFlavor)?.stock ?? 0;
 
-  if (!open) return null;
-
-  const validate = (): boolean => {
-    const e: Record<string, string> = {};
-    if (!info.name.trim()) e.name = 'Informe seu nome.';
-    if (!info.phone.trim()) e.phone = 'Informe seu telefone/WhatsApp.';
-    if (!info.address.trim()) e.address = 'Informe a rua.';
-    if (!info.number.trim()) e.number = 'Informe o número.';
-    if (!info.district.trim()) e.district = 'Informe o bairro.';
-    if (!info.payment) e.payment = 'Escolha a forma de pagamento.';
-    if (info.payment === 'Dinheiro' && info.troco && !info.troco.trim())
-      e.troco = 'Informe o valor do troco.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) return;
-    
-    const url = buildWhatsAppMessage(
-      cart,
-      info,
-      appliedCoupon,
-      subtotal,
-      discount,
-      finalTotal, 
-    );
-    
-    // REGISTRA A VENDA, ABATE O ESTOQUE POR SABOR E CADASTRA O CLIENTE NA NUVEM
-    await recordSale(finalTotal, { name: info.name, phone: info.phone });
-    
-    window.open(url, '_blank');
-    setSent(true);
-  };
-
-  const handleClose = () => {
-    if (sent) {
-      clearCart();
-      setInfo({
-        name: '',
-        phone: '',
-        address: '',
-        number: '',
-        district: '',
-        reference: '',
-        payment: null,
-        troco: '',
-        deliveryFee: 8,
-      });
-      setSent(false);
-      onDone();
+  useEffect(() => {
+    if (product) {
+      const firstAvailable = flavors.find((f) => f.stock > 0) || flavors[0];
+      setSelectedFlavor(firstAvailable?.name || '');
+      setQuantity(1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product]);
+
+  // ESSA É A MÁGICA QUE TRAVA O FUNDO E ACABA COM O LAG/PULOS DA TELA
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    // Limpa a trava caso o componente seja desmontado
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  // FUNIL — etapa 1: registra "visualização" toda vez que o modal abre com um produto
+  useEffect(() => {
+    if (isOpen && product) {
+      trackFunnelEvent('view', product.id, product.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, product]);
+
+  if (!isOpen || !product) return null;
+
+  const handleAdd = () => {
+    if (selectedFlavorStock <= 0) {
+      alert('Esse sabor está esgotado no momento.');
+      return;
+    }
+    if (quantity > selectedFlavorStock) {
+      alert(`Só temos ${selectedFlavorStock} unidade(s) desse sabor em estoque.`);
+      return;
+    }
+
+    // FUNIL — etapa 2: registra "clique em comprar" (adicionou à sacola)
+    trackFunnelEvent('click_buy', product.id, product.name, quantity);
+
+    onAddToCart(product, selectedFlavor, quantity);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
-      <div
-        className="absolute inset-0 bg-ink/40 backdrop-blur-sm animate-fade-in transition-opacity"
-        onClick={handleClose}
-      />
-      
-      <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-line bg-white shadow-2xl animate-slide-up sm:rounded-3xl">
-        
-        <div className="flex items-center justify-between border-b border-line px-5 py-4 bg-white">
-          <h2 className="font-display text-lg font-bold text-ink">
-            {sent ? 'Pedido Enviado' : 'Finalizar Pedido'}
-          </h2>
+    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
+
+      <div className="relative flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl animate-slide-up">
+
+        {/* Cabeçalho Visual (FOTO REAL ou Emoji) */}
+        <div className={`relative flex h-56 sm:h-64 w-full items-center justify-center bg-gradient-to-br ${product.gradient} overflow-hidden`}>
           <button
-            onClick={handleClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-inkSoft transition-all duration-300 hover:scale-110 hover:bg-bgAlt hover:text-ink active:scale-95"
+            onClick={onClose}
+            className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-white backdrop-blur-md transition hover:bg-black/40"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
+
+          {product.image ? (
+            <img src={product.image} alt={product.name} className="h-full w-full object-cover transition-transform duration-700 hover:scale-105" />
+          ) : (
+            <span className="text-7xl drop-shadow-lg transition-transform duration-500 hover:scale-110">
+              {product.emoji}
+            </span>
+          )}
         </div>
 
-        {sent ? (
-          <div className="flex flex-col items-center gap-4 px-6 py-12 text-center bg-white">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accentSoft">
-              <Check className="h-8 w-8 text-accent" />
+        {/* Corpo do Modal - Onde a rolagem vai funcionar perfeitamente agora */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-widest text-inkSoft">{product.brand}</p>
+            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${selectedFlavorStock > 0 ? 'bg-accentSoft text-accent' : 'bg-red-50 text-red-500'}`}>
+              {selectedFlavorStock > 0 ? 'Em Estoque' : 'Esgotado'}
+            </span>
+          </div>
+
+          <h2 className="font-display text-2xl font-bold text-ink">{product.name}</h2>
+          <p className="mt-2 text-2xl font-bold text-accent">{formatBRL(product.price)}</p>
+
+          <div className="mt-6">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
+              <FileText className="h-4 w-4" /> Descrição
             </div>
-            <h3 className="font-display text-xl font-bold text-ink">
-              Pedido enviado ao WhatsApp!
-            </h3>
-            <p className="max-w-sm text-sm text-inkSoft">
-              Abrimos o WhatsApp da loja com seu pedido já formatado. É só enviar a mensagem e
-              nosso atendente confirma a entrega em minutos.
+            <p className="text-sm leading-relaxed text-ink/70">
+              {product.description || 'Nenhuma descrição detalhada informada para este produto.'}
             </p>
+          </div>
+
+          <div className="mt-6 border-t border-line pt-6">
+            <div className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
+              <Droplets className="h-4 w-4" /> Escolha o Sabor
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {flavors.map((f) => {
+                const isOut = f.stock <= 0;
+                return (
+                  <button
+                    key={f.name}
+                    onClick={() => !isOut && setSelectedFlavor(f.name)}
+                    disabled={isOut}
+                    className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${
+                      isOut
+                        ? 'cursor-not-allowed border-line bg-bgAlt text-inkSoft/50 line-through'
+                        : selectedFlavor === f.name
+                        ? 'border-accent bg-accent text-white shadow-md'
+                        : 'border-line bg-bg text-ink hover:border-accent/50'
+                    }`}
+                  >
+                    {f.name}
+                    {!isOut && f.stock <= 3 && (
+                      <span className="ml-1.5 text-[10px] opacity-80">({f.stock})</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-line bg-bg p-4 sm:p-6 flex items-center gap-4">
+          <div className="flex h-12 items-center rounded-xl border border-line bg-white">
             <button
-              onClick={handleClose}
-              className="mt-4 rounded-xl bg-ink px-8 py-3.5 text-sm font-bold text-white transition-all duration-300 hover:scale-105 hover:bg-ink/90 active:scale-95 shadow-md"
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              className="flex h-full w-10 items-center justify-center text-inkSoft transition hover:text-ink disabled:opacity-50"
+              disabled={quantity <= 1}
             >
-              Continuar Comprando
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="w-8 text-center text-sm font-bold text-ink">
+              {quantity}
+            </span>
+            <button
+              onClick={() => setQuantity(Math.min(selectedFlavorStock || 1, quantity + 1))}
+              className="flex h-full w-10 items-center justify-center text-inkSoft transition hover:text-ink"
+            >
+              <Plus className="h-4 w-4" />
             </button>
           </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto px-5 py-5 bg-white">
-            
-            <Field label="Nome Completo" icon={<User className="h-3.5 w-3.5" />} error={errors.name}>
-              <input
-                value={info.name}
-                onChange={(e) => setInfo({ ...info, name: e.target.value })}
-                placeholder="Seu nome completo"
-                className={inputCls(errors.name)}
-              />
-            </Field>
 
-            <Field label="WhatsApp / Celular" icon={<Phone className="h-3.5 w-3.5" />} error={errors.phone}>
-              <input
-                type="tel"
-                value={info.phone}
-                onChange={(e) => setInfo({ ...info, phone: e.target.value })}
-                placeholder="(67) 99999-9999"
-                className={inputCls(errors.phone)}
-              />
-            </Field>
-
-            <div className="mb-4">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
-                <MapPin className="h-3.5 w-3.5" /> Endereço Completo
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-2">
-                  <input
-                    value={info.address}
-                    onChange={(e) => setInfo({ ...info, address: e.target.value })}
-                    placeholder="Rua"
-                    className={inputCls(errors.address)}
-                  />
-                  {errors.address && <p className="mt-1 text-xs text-red-500">{errors.address}</p>}
-                </div>
-                <input
-                  value={info.number}
-                  onChange={(e) => setInfo({ ...info, number: e.target.value })}
-                  placeholder="Nº"
-                  className={inputCls(errors.number)}
-                />
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <input
-                    value={info.district}
-                    onChange={(e) => setInfo({ ...info, district: e.target.value })}
-                    placeholder="Bairro"
-                    className={inputCls(errors.district)}
-                  />
-                  {errors.district && <p className="mt-1 text-xs text-red-500">{errors.district}</p>}
-                </div>
-                <input
-                  value={info.reference}
-                  onChange={(e) => setInfo({ ...info, reference: e.target.value })}
-                  placeholder="Ponto de referência"
-                  className={inputCls()}
-                />
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
-                <Map className="h-3.5 w-3.5" /> Taxa de Entrega
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setInfo({ ...info, deliveryFee: 8 })}
-                  className={`flex flex-col items-start justify-center rounded-xl border px-3 py-3 transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
-                    info.deliveryFee === 8
-                      ? 'border-accent bg-accentSoft text-ink shadow-sm'
-                      : 'border-line bg-white text-inkSoft hover:border-accent/40 hover:bg-bgAlt'
-                  }`}
-                >
-                  <span className="text-xs font-bold">Dentro da Cidade</span>
-                  <span className="text-[11px] font-semibold text-accent">+ R$ 8,00</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInfo({ ...info, deliveryFee: 15 })}
-                  className={`flex flex-col items-start justify-center rounded-xl border px-3 py-3 transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
-                    info.deliveryFee === 15
-                      ? 'border-accent bg-accentSoft text-ink shadow-sm'
-                      : 'border-line bg-white text-inkSoft hover:border-accent/40 hover:bg-bgAlt'
-                  }`}
-                >
-                  <span className="text-xs font-bold">Bairros Longes/Fora</span>
-                  <span className="text-[11px] font-semibold text-accent">+ R$ 15,00</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-inkSoft">
-                Forma de Pagamento
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {PAYMENTS.map((p) => {
-                  const active = info.payment === p.key;
-                  const Icon = p.icon;
-                  return (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => setInfo({ ...info, payment: p.key })}
-                      className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-sm font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
-                        active
-                          ? 'border-accent bg-accent text-white shadow-md'
-                          : 'border-line bg-white text-ink hover:border-accent/40 hover:bg-bgAlt'
-                      }`}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {errors.payment && <p className="mt-1 text-xs text-red-500">{errors.payment}</p>}
-            </div>
-
-            {info.payment === 'Dinheiro' && (
-              <div className="mb-4 animate-slide-up">
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-inkSoft">
-                  Precisa de troco? Para quanto?
-                </p>
-                <input
-                  value={info.troco}
-                  onChange={(e) => setInfo({ ...info, troco: e.target.value })}
-                  placeholder="Ex: R$ 100,00 (deixe vazio se não precisar)"
-                  className={inputCls()}
-                />
-              </div>
-            )}
-
-            <div className="rounded-xl border border-line bg-bgAlt p-4 mt-2">
-              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-inkSoft">
-                Resumo do Pedido
-              </p>
-              <div className="space-y-2 text-sm">
-                {cart.map((item) => (
-                  <div key={`${item.product.id}-${item.selectedFlavor}`} className="flex justify-between items-start text-ink">
-                    <div className="pr-2">
-                      <span className="font-semibold block">
-                        {item.quantity}x {item.product.brand} {item.product.name}
-                      </span>
-                      <span className="text-xs text-inkSoft">Sabor: {item.selectedFlavor}</span>
-                    </div>
-                    <span className="shrink-0 font-medium">{formatBRL(item.product.price * item.quantity)}</span>
-                  </div>
-                ))}
-                
-                <div className="flex justify-between border-t border-line pt-3 text-inkSoft">
-                  <span>Subtotal</span>
-                  <span className="font-medium text-ink">{formatBRL(subtotal)}</span>
-                </div>
-                
-                <div className="flex justify-between text-inkSoft">
-                  <span>Taxa de Entrega</span>
-                  <span className="font-medium text-ink">+{formatBRL(info.deliveryFee)}</span>
-                </div>
-
-                {appliedCoupon && discount > 0 && (
-                  <div className="flex justify-between text-green-600 font-medium">
-                    <span>Cupom {appliedCoupon.code}</span>
-                    <span>-{formatBRL(discount)}</span>
-                  </div>
-                )}
-                
-                <div className="flex justify-between font-display text-lg font-bold text-ink pt-2">
-                  <span>Total</span>
-                  <span className="text-accent">{formatBRL(finalTotal)}</span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-4 text-base font-bold text-white transition-all duration-300 hover:scale-[1.02] hover:bg-ink/90 active:scale-95 shadow-xl shadow-ink/10"
-            >
-              Enviar Pedido via WhatsApp
-              <ArrowRight className="h-5 w-5" />
-            </button>
-          </div>
-        )}
+          <button
+            onClick={handleAdd}
+            disabled={selectedFlavorStock <= 0}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-sm font-bold text-white transition-all hover:bg-ink/90 hover:shadow-lg active:scale-95 disabled:opacity-40 disabled:hover:shadow-none"
+          >
+            <ShoppingBag className="h-4 w-4" />
+            {selectedFlavorStock > 0 ? 'Adicionar à Sacola' : 'Sabor Esgotado'}
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
-
-function inputCls(error?: string): string {
-  return `w-full rounded-xl border bg-white px-4 py-3 text-sm text-ink placeholder-inkSoft/50 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent ${
-    error ? 'border-red-500' : 'border-line'
-  }`;
-}
-
-function Field({
-  label,
-  icon,
-  error,
-  children,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-4">
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
-        {icon} {label}
-      </p>
-      {children}
-      {error && <p className="mt-1 text-xs font-medium text-red-500">{error}</p>}
     </div>
   );
 }
