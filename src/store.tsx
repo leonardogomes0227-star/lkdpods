@@ -8,8 +8,13 @@ import {
   type ReactNode,
 } from 'react';
 import type { CartItem, Coupon, Product } from './types';
-import { storage, ADMIN_CREDENTIALS } from './storage';
+import { storage } from './storage';
 import { supabase } from './supabase'; // <-- NOSSA CONEXÃO COM A NUVEM AQUI!
+
+export const ADMIN_CREDENTIALS = {
+  email: 'admin@lkdimports.com',
+  password: 'admin123',
+};
 
 export interface Sale {
   id: string;
