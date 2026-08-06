@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from './supabaseClient';
-import type { Product, CartItem, Sale, FlavorStock } from './types';
+import type { Product, CartItem, Sale, FlavorStock, Customer, Order } from './types';
 
 interface Coupon {
   id: string;
@@ -14,6 +14,8 @@ interface StoreState {
   cart: CartItem[];
   sales: Sale[];
   coupons: Coupon[];
+  customers: Customer[];
+  orders: Order[];
   cartCount: number;
   subtotal: number;
   discount: number;
@@ -26,6 +28,8 @@ interface StoreState {
   monthlyTotal: number;
   fetchProducts: () => Promise<void>;
   fetchSales: () => Promise<void>;
+  fetchCustomers: () => Promise<void>;
+  fetchOrders: () => Promise<void>;
   setProducts: (products: Product[]) => void;
   addToCart: (product: Product, qty?: number, flavor?: string) => boolean;
   recordSale: (amount: number, customerInfo?: { name: string; phone: string }) => Promise<void>;
@@ -62,12 +66,49 @@ function computeTotals(sales: Sale[]) {
   return { dailyTotal: daily, weeklyTotal: weekly, monthlyTotal: monthly };
 }
 
-// Reduz o estoque de um sabor específico dentro da lista de sabores do produto
+// Reduz o estoque de um sabor específico e marca a data da última venda (Controle Inteligente de Estoque)
 function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: string, qty: number): FlavorStock[] {
   const list = Array.isArray(flavors) ? flavors : [];
+  const now = Date.now();
   return list.map((f) =>
-    f.name === flavorName ? { ...f, stock: Math.max(0, f.stock - qty) } : f
+    f.name === flavorName ? { ...f, stock: Math.max(0, f.stock - qty), lastSoldAt: now } : f
   );
+}
+
+function mapOrderFromDb(row: any): Order {
+  return {
+    id: row.id,
+    customerPhone: row.customer_phone,
+    customerName: row.customer_name,
+    timestamp: row.timestamp,
+    totalAmount: row.total_amount,
+    totalCost: row.total_cost,
+    profit: row.profit,
+    items: Array.isArray(row.order_items)
+      ? row.order_items.map((i: any) => ({
+          id: i.id,
+          productId: i.product_id,
+          productName: i.product_name,
+          brand: i.brand,
+          flavor: i.flavor,
+          quantity: i.quantity,
+          unitPrice: i.unit_price,
+          unitCost: i.unit_cost,
+        }))
+      : [],
+  };
+}
+
+function mapCustomerFromDb(row: any): Customer {
+  return {
+    id: row.phone,
+    phone: row.phone,
+    name: row.name,
+    firstPurchase: row.first_purchase,
+    lastPurchase: row.last_purchase,
+    purchaseCount: row.purchase_count || 0,
+    totalSpent: row.total_spent || 0,
+  };
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -75,6 +116,8 @@ export const useStore = create<StoreState>((set, get) => ({
   cart: [],
   sales: [],
   coupons: [],
+  customers: [],
+  orders: [],
   cartCount: 0,
   subtotal: 0,
   discount: 0,
@@ -108,6 +151,42 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (err) {
       console.error('Erro ao buscar vendas:', err);
       set({ sales: [], dailyTotal: 0, weeklyTotal: 0, monthlyTotal: 0 });
+    }
+  },
+
+  // Cadastro Inteligente de Clientes
+  fetchCustomers: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('last_purchase', { ascending: false });
+      if (!error && Array.isArray(data)) {
+        set({ customers: data.map(mapCustomerFromDb) });
+      } else {
+        set({ customers: [] });
+      }
+    } catch (err) {
+      console.error('Erro ao buscar clientes:', err);
+      set({ customers: [] });
+    }
+  },
+
+  // Histórico de Compras (pedidos + itens, mais recentes primeiro)
+  fetchOrders: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .order('timestamp', { ascending: false });
+      if (!error && Array.isArray(data)) {
+        set({ orders: data.map(mapOrderFromDb) });
+      } else {
+        set({ orders: [] });
+      }
+    } catch (err) {
+      console.error('Erro ao buscar pedidos:', err);
+      set({ orders: [] });
     }
   },
 
@@ -159,22 +238,47 @@ export const useStore = create<StoreState>((set, get) => ({
     return success;
   },
 
+  // ===== FLUXO AUTOMÁTICO DE VENDA =====
+  // Ao fechar a venda: cria o pedido, salva cada item vendido (produto+sabor+qtd+valor),
+  // baixa o estoque só do sabor certo, calcula lucro e atualiza o histórico do cliente — tudo de uma vez.
   recordSale: async (amount, customerInfo) => {
     const timestamp = Date.now();
-    const tempId = Math.random().toString();
     const state = get();
+    const cartItems = Array.isArray(state.cart) ? state.cart : [];
 
+    const totalCost = cartItems.reduce((sum, item) => sum + item.product.cost * item.quantity, 0);
+    const profit = amount - totalCost;
+
+    // Mantém a lista "sales" antiga funcionando (compatibilidade com o dashboard atual)
+    const tempSaleId = Math.random().toString();
     set((prev) => {
-      const newSales = [...(prev.sales || []), { id: tempId, amount, timestamp }];
+      const newSales = [...(prev.sales || []), { id: tempSaleId, amount, timestamp }];
       return { sales: newSales, ...computeTotals(newSales) };
     });
+    await supabase.from('sales').insert([{ amount, timestamp }]);
 
-    await supabase
-      .from('sales')
-      .insert([{ amount, timestamp }]);
+    // 1) Cria o pedido (cabeçalho da venda)
+    let orderId: string | null = null;
+    try {
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          customer_phone: customerInfo?.phone?.trim() || null,
+          customer_name: customerInfo?.name?.trim() || null,
+          timestamp,
+          total_amount: amount,
+          total_cost: totalCost,
+          profit,
+        }])
+        .select()
+        .single();
+      if (!orderError && orderData) orderId = orderData.id;
+    } catch (err) {
+      console.error('Erro ao criar pedido:', err);
+    }
 
-    // Baixa o estoque APENAS do sabor vendido em cada item do carrinho
-    for (const item of (Array.isArray(state.cart) ? state.cart : [])) {
+    // 2) Baixa o estoque do sabor vendido + grava cada item do pedido
+    for (const item of cartItems) {
       const product = item.product;
       const updatedFlavors = decrementFlavorStock(product.flavors, item.selectedFlavor, item.quantity);
       const newTotalStock = updatedFlavors.reduce((sum, f) => sum + f.stock, 0);
@@ -189,17 +293,106 @@ export const useStore = create<StoreState>((set, get) => ({
         .from('products')
         .update({ flavors: updatedFlavors, stock: newTotalStock })
         .eq('id', product.id);
+
+      if (orderId) {
+        await supabase.from('order_items').insert([{
+          order_id: orderId,
+          product_id: product.id,
+          product_name: product.name,
+          brand: product.brand,
+          flavor: item.selectedFlavor,
+          quantity: item.quantity,
+          unit_price: product.price,
+          unit_cost: product.cost,
+        }]);
+      }
     }
 
+    // 3) Cria ou atualiza o cadastro do cliente (nome, telefone, 1ª/última compra, qtd, total gasto)
     if (customerInfo && customerInfo.phone) {
-      await supabase.from('customers').upsert([
-        {
-          phone: customerInfo.phone.trim(),
-          name: customerInfo.name.trim(),
-          last_purchase: timestamp,
-          total_spent: amount,
+      const phone = customerInfo.phone.trim();
+      const name = customerInfo.name.trim();
+
+      try {
+        const { data: existing } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('phone', phone)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from('customers')
+            .update({
+              name,
+              last_purchase: timestamp,
+              purchase_count: (existing.purchase_count || 0) + 1,
+              total_spent: (existing.total_spent || 0) + amount,
+            })
+            .eq('phone', phone);
+        } else {
+          await supabase.from('customers').insert([{
+            phone,
+            name,
+            first_purchase: timestamp,
+            last_purchase: timestamp,
+            purchase_count: 1,
+            total_spent: amount,
+          }]);
         }
-      ], { onConflict: 'phone' });
+      } catch (err) {
+        console.error('Erro ao atualizar cliente:', err);
+      }
+
+      // Atualiza a lista local (se a tela de clientes já estiver carregada)
+      set((prev) => {
+        const customers = Array.isArray(prev.customers) ? prev.customers : [];
+        const idx = customers.findIndex((c) => c.phone === phone);
+        if (idx >= 0) {
+          const updated = [...customers];
+          updated[idx] = {
+            ...updated[idx],
+            name,
+            lastPurchase: timestamp,
+            purchaseCount: updated[idx].purchaseCount + 1,
+            totalSpent: updated[idx].totalSpent + amount,
+          };
+          return { customers: updated };
+        }
+        return {
+          customers: [
+            { id: phone, phone, name, firstPurchase: timestamp, lastPurchase: timestamp, purchaseCount: 1, totalSpent: amount },
+            ...customers,
+          ],
+        };
+      });
+    }
+
+    // 4) Atualiza a lista local de pedidos (histórico de compras)
+    if (orderId) {
+      set((prev) => ({
+        orders: [
+          {
+            id: orderId!,
+            customerPhone: customerInfo?.phone,
+            customerName: customerInfo?.name,
+            timestamp,
+            totalAmount: amount,
+            totalCost,
+            profit,
+            items: cartItems.map((item) => ({
+              productId: item.product.id,
+              productName: item.product.name,
+              brand: item.product.brand,
+              flavor: item.selectedFlavor,
+              quantity: item.quantity,
+              unitPrice: item.product.price,
+              unitCost: item.product.cost,
+            })),
+          },
+          ...(Array.isArray(prev.orders) ? prev.orders : []),
+        ],
+      }));
     }
   },
 
