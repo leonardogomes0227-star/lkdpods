@@ -13,3 +13,12 @@ export async function logSecurityEvent(action: string, details: string) {
     console.error('Erro ao registrar log de segurança:', err);
   }
 }
+
+// Higieniza textos contra caracteres maliciosos ou scripts
+export function sanitizeInput(input: string): string {
+  if (!input) return '';
+  return input
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<[^>]*>?/gm, '')
+    .trim();
+}
