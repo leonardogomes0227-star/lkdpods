@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Flame, Instagram, MessageCircle, Truck } from 'lucide-react';
-import { StoreProvider, useStore } from './store';
+import { useStore } from './store';
 import { AnimatedBackground } from './components/AnimatedBackground';
 import { FlashBanner } from './components/FlashBanner';
 import { Header } from './components/Header';
@@ -12,7 +12,7 @@ import { CheckoutModal } from './components/CheckoutModal';
 import { AdminLogin } from './components/AdminLogin';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ProductModal } from './components/ProductModal';
-import { CustomerPortalModal } from './components/CustomerPortalModal'; // <-- Importando o modal do Clube Fidelidade!
+import { CustomerPortalModal } from './components/CustomerPortalModal';
 import type { Product } from './types';
 
 function Toast({ message }: { message: string }) {
@@ -76,7 +76,9 @@ function Footer() {
               </p>
               <div className="flex gap-2">
                 <a
-                  href="#"
+                  href="https://www.instagram.com/lkd_importes?igsh=cm45M2VnMzQ2czhk&utm_source=qr"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-ink transition-all duration-300 hover:scale-110 hover:border-accent/40 hover:text-accent active:scale-95"
                 >
                   <Instagram className="h-5 w-5" />
@@ -100,13 +102,13 @@ function Footer() {
   );
 }
 
-function StoreFront() {
+export default function App() {
   const { flashDeadline, isAuthed, addToCart } = useStore();
   
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
-  const [portalOpen, setPortalOpen] = useState(false); // Estado da modal de Fidelidade/Histórico
+  const [portalOpen, setPortalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   
@@ -164,7 +166,6 @@ function StoreFront() {
         }}
       />
 
-      {/* Modal do Portal / Clube Fidelidade do Cliente */}
       <CustomerPortalModal
         isOpen={portalOpen}
         onClose={() => setPortalOpen(false)}
@@ -173,13 +174,5 @@ function StoreFront() {
       {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} />}
       {toast && <Toast message={toast} />}
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <StoreProvider>
-      <StoreFront />
-    </StoreProvider>
   );
 }
