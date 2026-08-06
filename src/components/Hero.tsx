@@ -1,5 +1,5 @@
 import React from 'react';
-import { useStore } from './store';
+import { useStore } from '../store'; // <-- Ajustado para voltar uma pasta
 
 export const Hero: React.FC = () => {
   const { products } = useStore();
