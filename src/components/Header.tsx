@@ -1,4 +1,4 @@
-import { Lock, Search, ShoppingBag, Star } from 'lucide-react';
+import { Lock, Search, ShoppingBag, Star, Instagram } from 'lucide-react';
 import { useStore } from '../store';
 
 interface Props {
@@ -39,6 +39,18 @@ export function Header({ onOpenCart, onOpenAdmin, onOpenPortal, search, setSearc
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {/* Botão do Instagram */}
+          <a
+            href="https://www.instagram.com/lkd_importes?igsh=cm45M2VnMzQ2czhk&utm_source=qr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-inkSoft transition-all duration-300 hover:scale-105 hover:border-pink-400 hover:text-pink-600 active:scale-95 shadow-sm"
+            aria-label="Instagram"
+            title="Siga no Instagram"
+          >
+            <Instagram className="h-4 w-4" />
+          </a>
+
           {/* Botão do Clube de Fidelidade / Histórico */}
           <button
             onClick={onOpenPortal}
