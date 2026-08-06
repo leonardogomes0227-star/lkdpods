@@ -3,6 +3,7 @@ import { ArrowRight, Check, Landmark, Banknote, CreditCard, MapPin, User, X, Map
 import type { CheckoutInfo, PaymentMethod } from '../types';
 import { useStore } from '../store';
 import { buildWhatsAppMessage, formatBRL } from '../utils';
+import { trackFunnelEvent } from '../funnelTracker';
 
 interface Props {
   open: boolean;
@@ -66,6 +67,18 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
     
     // REGISTRA A VENDA, ABATE O ESTOQUE POR SABOR E CADASTRA O CLIENTE NA NUVEM
     await recordSale(finalTotal, { name: info.name, phone: info.phone });
+
+    // FUNIL — etapa 3: cliente foi direcionado ao WhatsApp pra fechar o pedido
+    cart.forEach((item) => {
+      trackFunnelEvent('whatsapp', item.product.id, item.product.name, item.quantity);
+    });
+
+    // FUNIL — etapa 4: consideramos "compra concluída" no momento do envio ao WhatsApp.
+    // Se preferir só confirmar quando o pagamento cair de fato, mova esta chamada
+    // pra um botão manual no painel admin (ex: "Marcar pedido como pago").
+    cart.forEach((item) => {
+      trackFunnelEvent('purchase', item.product.id, item.product.name, item.quantity);
+    });
     
     window.open(url, '_blank');
     setSent(true);
