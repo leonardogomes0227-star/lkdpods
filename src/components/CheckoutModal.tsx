@@ -1,72 +1,110 @@
-import { useState, useEffect } from 'react';
-import { X, ShoppingBag, FileText, Droplets, Minus, Plus } from 'lucide-react';
-import type { Product } from '../types';
-import { formatBRL } from '../utils';
+import { useState } from 'react';
+import { X, MapPin, User, CreditCard, MessageCircle } from 'lucide-react';
+import type { CartItem, Order, OrderItem } from '../types';
+import type { Coupon } from '../types'; // se seu Coupon estiver em outro arquivo, ajuste este import
+import { formatBRL, buildWhatsAppMessage } from '../utils';
+import { calculateDiscount } from '../utils/coupon'; // ajuste o caminho se colocar em outro lugar
 import { trackFunnelEvent } from '../utils/funnelTracker';
+import { saveOrder, upsertCustomer } from '../utils/orderHistory';
 
-interface Props {
-  product: Product | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onAddToCart: (product: Product, selectedFlavor: string, quantity: number) => void;
+export interface CheckoutInfo {
+  name: string;
+  phone: string;
+  address: string;
+  number: string;
+  district: string;
+  reference?: string;
+  deliveryFee: number;
+  payment: 'Pix' | 'Cartão' | 'Dinheiro';
+  troco?: string;
 }
 
-export function ProductModal({ product, isOpen, onClose, onAddToCart }: Props) {
-  const [selectedFlavor, setSelectedFlavor] = useState<string>('');
-  const [quantity, setQuantity] = useState(1);
+interface Props {
+  cart: CartItem[];
+  isOpen: boolean;
+  onClose: () => void;
+  coupon: Coupon | null;
+  deliveryFee: number;
+  onOrderSent: () => void; // ex: limpar carrinho
+}
 
-  const flavors = Array.isArray(product?.flavors) && product!.flavors.length > 0
-    ? product!.flavors
-    : [{ name: 'Padrão', stock: 999 }];
+const emptyInfo: CheckoutInfo = {
+  name: '',
+  phone: '',
+  address: '',
+  number: '',
+  district: '',
+  reference: '',
+  deliveryFee: 0,
+  payment: 'Pix',
+  troco: '',
+};
 
-  const selectedFlavorStock = flavors.find((f) => f.name === selectedFlavor)?.stock ?? 0;
+export function CheckoutModal({ cart, isOpen, onClose, coupon, deliveryFee, onOrderSent }: Props) {
+  const [info, setInfo] = useState<CheckoutInfo>({ ...emptyInfo, deliveryFee });
 
-  useEffect(() => {
-    if (product) {
-      const firstAvailable = flavors.find((f) => f.stock > 0) || flavors[0];
-      setSelectedFlavor(firstAvailable?.name || '');
-      setQuantity(1);
+  if (!isOpen) return null;
+
+  const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const discount = calculateDiscount(coupon, subtotal);
+  const total = subtotal - discount + info.deliveryFee;
+
+  const isValid = info.name.trim() && info.phone.trim() && info.address.trim() && info.district.trim();
+
+  const handleField = (field: keyof CheckoutInfo, value: string) => {
+    setInfo((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFinish = () => {
+    if (!isValid) {
+      alert('Preencha nome, telefone, endereço e bairro pra continuar.');
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product]);
 
-  // ESSA É A MÁGICA QUE TRAVA O FUNDO E ACABA COM O LAG/PULOS DA TELA
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    // Limpa a trava caso o componente seja desmontado
-    return () => {
-      document.body.style.overflow = '';
+    // Monta o pedido pra salvar no histórico (base da Reposição Inteligente)
+    const orderItems: OrderItem[] = cart.map((item) => ({
+      productId: item.product.id,
+      productName: item.product.name,
+      brand: item.product.brand,
+      flavor: item.selectedFlavor,
+      quantity: item.quantity,
+      unitPrice: item.product.price,
+      unitCost: item.product.cost,
+    }));
+
+    const totalCost = orderItems.reduce((sum, i) => sum + i.unitCost * i.quantity, 0);
+
+    const order: Order = {
+      id: `order_${Date.now()}`,
+      customerPhone: info.phone,
+      customerName: info.name,
+      timestamp: Date.now(),
+      totalAmount: total,
+      totalCost,
+      profit: total - totalCost,
+      items: orderItems,
     };
-  }, [isOpen]);
 
-  // FUNIL — etapa 1: registra "visualização" toda vez que o modal abre com um produto
-  useEffect(() => {
-    if (isOpen && product) {
-      trackFunnelEvent('view', product.id, product.name);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, product]);
+    saveOrder(order);
+    upsertCustomer(info.phone, info.name, total);
 
-  if (!isOpen || !product) return null;
+    // FUNIL — etapa 3: cliente foi direcionado ao WhatsApp pra fechar o pedido
+    cart.forEach((item) => {
+      trackFunnelEvent('whatsapp', item.product.id, item.product.name, item.quantity);
+    });
 
-  const handleAdd = () => {
-    if (selectedFlavorStock <= 0) {
-      alert('Esse sabor está esgotado no momento.');
-      return;
-    }
-    if (quantity > selectedFlavorStock) {
-      alert(`Só temos ${selectedFlavorStock} unidade(s) desse sabor em estoque.`);
-      return;
-    }
+    // FUNIL — etapa 4: consideramos "compra concluída" no momento em que o pedido
+    // é montado e enviado ao WhatsApp. Se preferir confirmar só quando o pagamento
+    // for de fato recebido, mova essa chamada pra um botão manual no seu painel
+    // (ex: "Marcar pedido como pago"), passando order.id.
+    cart.forEach((item) => {
+      trackFunnelEvent('purchase', item.product.id, item.product.name, item.quantity);
+    });
 
-    // FUNIL — etapa 2: registra "clique em comprar" (adicionou à sacola)
-    trackFunnelEvent('click_buy', product.id, product.name, quantity);
+    const link = buildWhatsAppMessage(cart, info, coupon, subtotal, discount, total);
+    window.open(link, '_blank');
 
-    onAddToCart(product, selectedFlavor, quantity);
+    onOrderSent();
     onClose();
   };
 
@@ -75,104 +113,130 @@ export function ProductModal({ product, isOpen, onClose, onAddToCart }: Props) {
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
       <div className="relative flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl animate-slide-up">
-
-        {/* Cabeçalho Visual (FOTO REAL ou Emoji) */}
-        <div className={`relative flex h-56 sm:h-64 w-full items-center justify-center bg-gradient-to-br ${product.gradient} overflow-hidden`}>
+        <div className="flex items-center justify-between border-b border-line p-5">
+          <h2 className="font-display text-xl font-bold text-ink">Finalizar Pedido</h2>
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-white backdrop-blur-md transition hover:bg-black/40"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-bgAlt text-inkSoft transition hover:bg-line"
           >
             <X className="h-4 w-4" />
           </button>
-
-          {product.image ? (
-            <img src={product.image} alt={product.name} className="h-full w-full object-cover transition-transform duration-700 hover:scale-105" />
-          ) : (
-            <span className="text-7xl drop-shadow-lg transition-transform duration-500 hover:scale-110">
-              {product.emoji}
-            </span>
-          )}
         </div>
 
-        {/* Corpo do Modal - Onde a rolagem vai funcionar perfeitamente agora */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-widest text-inkSoft">{product.brand}</p>
-            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${selectedFlavorStock > 0 ? 'bg-accentSoft text-accent' : 'bg-red-50 text-red-500'}`}>
-              {selectedFlavorStock > 0 ? 'Em Estoque' : 'Esgotado'}
-            </span>
-          </div>
-
-          <h2 className="font-display text-2xl font-bold text-ink">{product.name}</h2>
-          <p className="mt-2 text-2xl font-bold text-accent">{formatBRL(product.price)}</p>
-
-          <div className="mt-6">
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
-              <FileText className="h-4 w-4" /> Descrição
-            </div>
-            <p className="text-sm leading-relaxed text-ink/70">
-              {product.description || 'Nenhuma descrição detalhada informada para este produto.'}
-            </p>
-          </div>
-
-          <div className="mt-6 border-t border-line pt-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div>
             <div className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
-              <Droplets className="h-4 w-4" /> Escolha o Sabor
+              <User className="h-4 w-4" /> Seus Dados
             </div>
-            <div className="flex flex-wrap gap-2">
-              {flavors.map((f) => {
-                const isOut = f.stock <= 0;
-                return (
-                  <button
-                    key={f.name}
-                    onClick={() => !isOut && setSelectedFlavor(f.name)}
-                    disabled={isOut}
-                    className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${
-                      isOut
-                        ? 'cursor-not-allowed border-line bg-bgAlt text-inkSoft/50 line-through'
-                        : selectedFlavor === f.name
-                        ? 'border-accent bg-accent text-white shadow-md'
-                        : 'border-line bg-bg text-ink hover:border-accent/50'
-                    }`}
-                  >
-                    {f.name}
-                    {!isOut && f.stock <= 3 && (
-                      <span className="ml-1.5 text-[10px] opacity-80">({f.stock})</span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="space-y-3">
+              <input
+                className="w-full rounded-xl border border-line px-4 py-3 text-sm"
+                placeholder="Nome completo"
+                value={info.name}
+                onChange={(e) => handleField('name', e.target.value)}
+              />
+              <input
+                className="w-full rounded-xl border border-line px-4 py-3 text-sm"
+                placeholder="WhatsApp (com DDD)"
+                value={info.phone}
+                onChange={(e) => handleField('phone', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
+              <MapPin className="h-4 w-4" /> Entrega
+            </div>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <input
+                  className="flex-1 rounded-xl border border-line px-4 py-3 text-sm"
+                  placeholder="Endereço"
+                  value={info.address}
+                  onChange={(e) => handleField('address', e.target.value)}
+                />
+                <input
+                  className="w-24 rounded-xl border border-line px-4 py-3 text-sm"
+                  placeholder="Nº"
+                  value={info.number}
+                  onChange={(e) => handleField('number', e.target.value)}
+                />
+              </div>
+              <input
+                className="w-full rounded-xl border border-line px-4 py-3 text-sm"
+                placeholder="Bairro"
+                value={info.district}
+                onChange={(e) => handleField('district', e.target.value)}
+              />
+              <input
+                className="w-full rounded-xl border border-line px-4 py-3 text-sm"
+                placeholder="Ponto de referência (opcional)"
+                value={info.reference}
+                onChange={(e) => handleField('reference', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-inkSoft">
+              <CreditCard className="h-4 w-4" /> Pagamento
+            </div>
+            <div className="flex gap-2">
+              {(['Pix', 'Cartão', 'Dinheiro'] as const).map((method) => (
+                <button
+                  key={method}
+                  onClick={() => handleField('payment', method)}
+                  className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition-all ${
+                    info.payment === method
+                      ? 'border-accent bg-accent text-white'
+                      : 'border-line bg-bg text-ink'
+                  }`}
+                >
+                  {method}
+                </button>
+              ))}
+            </div>
+            {info.payment === 'Dinheiro' && (
+              <input
+                className="mt-3 w-full rounded-xl border border-line px-4 py-3 text-sm"
+                placeholder="Troco para quanto?"
+                value={info.troco}
+                onChange={(e) => handleField('troco', e.target.value)}
+              />
+            )}
+          </div>
+
+          <div className="border-t border-line pt-4 space-y-1 text-sm">
+            <div className="flex justify-between text-inkSoft">
+              <span>Subtotal</span>
+              <span>{formatBRL(subtotal)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-accent">
+                <span>Cupom ({coupon?.code})</span>
+                <span>-{formatBRL(discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-inkSoft">
+              <span>Entrega</span>
+              <span>{formatBRL(info.deliveryFee)}</span>
+            </div>
+            <div className="flex justify-between text-base font-bold text-ink pt-2">
+              <span>Total</span>
+              <span>{formatBRL(total)}</span>
             </div>
           </div>
         </div>
 
-        <div className="border-t border-line bg-bg p-4 sm:p-6 flex items-center gap-4">
-          <div className="flex h-12 items-center rounded-xl border border-line bg-white">
-            <button
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="flex h-full w-10 items-center justify-center text-inkSoft transition hover:text-ink disabled:opacity-50"
-              disabled={quantity <= 1}
-            >
-              <Minus className="h-4 w-4" />
-            </button>
-            <span className="w-8 text-center text-sm font-bold text-ink">
-              {quantity}
-            </span>
-            <button
-              onClick={() => setQuantity(Math.min(selectedFlavorStock || 1, quantity + 1))}
-              className="flex h-full w-10 items-center justify-center text-inkSoft transition hover:text-ink"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-
+        <div className="border-t border-line bg-bg p-4 sm:p-6">
           <button
-            onClick={handleAdd}
-            disabled={selectedFlavorStock <= 0}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-sm font-bold text-white transition-all hover:bg-ink/90 hover:shadow-lg active:scale-95 disabled:opacity-40 disabled:hover:shadow-none"
+            onClick={handleFinish}
+            disabled={!isValid}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
           >
-            <ShoppingBag className="h-4 w-4" />
-            {selectedFlavorStock > 0 ? 'Adicionar à Sacola' : 'Sabor Esgotado'}
+            <MessageCircle className="h-4 w-4" />
+            Enviar Pedido pelo WhatsApp
           </button>
         </div>
       </div>
