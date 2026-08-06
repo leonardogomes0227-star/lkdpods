@@ -1,14 +1,38 @@
-// ADICIONE esta interface nova, logo ACIMA da interface Product:
+export type Category =
+  | 'Pods Descartáveis'
+  | 'Vapes Recarregáveis'
+  | 'Essências'
+  | 'Acessórios';
+
 export interface FlavorStock {
   name: string;
   stock: number;
 }
 
-// Dentro da interface Product, REMOVA a linha:
-//   flavor: string;
-// e ADICIONE no lugar dela:
-//   flavors: FlavorStock[];
-//
-// O campo "stock: number;" pode continuar existindo no Product — ele passa a
-// representar o estoque TOTAL (soma de todos os sabores), calculado
-// automaticamente pelo app. Não precisa mexer nele.
+export interface Product {
+  id: string;
+  brand: string;
+  name: string;
+  flavors: FlavorStock[];
+  description?: string;
+  category: Category;
+  price: number;
+  cost: number;
+  stock: number; // total (soma de todos os sabores) — calculado automaticamente
+  emoji: string;
+  gradient: string;
+  image?: string;
+  featured?: boolean;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+  selectedFlavor: string;
+}
+
+export interface Sale {
+  id: string;
+  amount: number;
+  timestamp: number;
+}
