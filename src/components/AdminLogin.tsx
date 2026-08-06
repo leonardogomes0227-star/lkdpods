@@ -12,9 +12,9 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onClose }) => {
   const [error, setError] = useState(false);
   const { login } = useStore();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(email, password);
+    const success = await login(email, password);
     if (success) {
       window.location.reload();
     } else {
@@ -53,7 +53,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onClose }) => {
             </label>
             <input
               type="email"
-              placeholder="admin@lkdimports.com"
+              placeholder="Digite seu e-mail de acesso"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError(false); }}
               className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500 transition-colors text-sm"
