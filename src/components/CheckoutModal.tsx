@@ -329,7 +329,7 @@ function inputCls(error?: string): string {
   }`;
 }
 
-Field({
+function Field({
   label,
   icon,
   error,
