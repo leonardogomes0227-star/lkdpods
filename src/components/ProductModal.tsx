@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, ShoppingBag, FileText, Droplets, Minus, Plus } from 'lucide-react';
 import type { Product } from '../types';
 import { formatBRL } from '../utils';
-import { trackFunnelEvent } from '../utils/funnelTracker';
+import { trackFunnelEvent } from '../funnelTracker';
 
 interface Props {
   product: Product | null;
