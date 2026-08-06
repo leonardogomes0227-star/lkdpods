@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createStore, useStore as useZustandStore } from 'zustand';
 import { supabase } from './supabaseClient';
 import type { Product, CartItem, Sale } from './types';
 
@@ -19,7 +19,7 @@ interface StoreState {
   setAuthed: (authed: boolean) => void;
 }
 
-export const useStore = create<StoreState>((set, get) => ({
+export const store = createStore<StoreState>((set, get) => ({
   products: [],
   cart: [],
   sales: [],
@@ -104,3 +104,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   clearCart: () => set({ cart: [], cartCount: 0, subtotal: 0, total: 0, discount: 0, appliedCoupon: null }),
 }));
+
+export function useStore<T>(selector: (state: StoreState) => T): T {
+  return useZustandStore(store, selector);
+}
