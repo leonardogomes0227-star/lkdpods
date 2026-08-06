@@ -11,7 +11,8 @@ import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AdminLogin } from './components/AdminLogin';
 import { AdminDashboard } from './components/AdminDashboard';
-import { ProductModal } from './components/ProductModal'; // Importando o modal novo!
+import { ProductModal } from './components/ProductModal';
+import { CustomerPortalModal } from './components/CustomerPortalModal'; // <-- Importando o modal do Clube Fidelidade!
 import type { Product } from './types';
 
 function Toast({ message }: { message: string }) {
@@ -105,14 +106,13 @@ function StoreFront() {
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(false); // Estado da modal de Fidelidade/Histórico
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   
-  // Novos estados para o Modal do Produto
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productModalOpen, setProductModalOpen] = useState(false);
 
-  // Agora ele abre o modal em vez de colocar direto no carrinho
   const handleProductClick = (p: Product) => {
     setSelectedProduct(p);
     setProductModalOpen(true);
@@ -130,6 +130,7 @@ function StoreFront() {
         <Header
           onOpenCart={() => setCartOpen(true)}
           onOpenAdmin={() => setAdminLoginOpen(true)}
+          onOpenPortal={() => setPortalOpen(true)}
           search={search}
           setSearch={setSearch}
         />
@@ -152,7 +153,6 @@ function StoreFront() {
         onDone={() => setCheckoutOpen(false)}
       />
       
-      {/* Aqui fica o Modal do Produto */}
       <ProductModal
         product={selectedProduct}
         isOpen={productModalOpen}
@@ -162,6 +162,12 @@ function StoreFront() {
           setToast(`${qty}x ${product.name} (${flavor}) adicionado!`);
           setTimeout(() => setToast(null), 2500);
         }}
+      />
+
+      {/* Modal do Portal / Clube Fidelidade do Cliente */}
+      <CustomerPortalModal
+        isOpen={portalOpen}
+        onClose={() => setPortalOpen(false)}
       />
 
       {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} />}
