@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from './supabaseClient';
-import type { Product, CartItem, Sale } from './types';
+import type { Product, CartItem, Sale, FlavorStock } from './types';
 
 interface Coupon {
   id: string;
@@ -32,6 +32,7 @@ interface StoreState {
   clearCart: () => void;
   setAuthed: (authed: boolean) => void;
   logout: () => void;
+  addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   updateProduct: (id: string, changes: Partial<Product>) => Promise<void>;
   addCoupon: (code: string, discountPercent: number) => { ok: boolean; message: string };
@@ -59,6 +60,14 @@ function computeTotals(sales: Sale[]) {
   });
 
   return { dailyTotal: daily, weeklyTotal: weekly, monthlyTotal: monthly };
+}
+
+// Reduz o estoque de um sabor específico dentro da lista de sabores do produto
+function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: string, qty: number): FlavorStock[] {
+  const list = Array.isArray(flavors) ? flavors : [];
+  return list.map((f) =>
+    f.name === flavorName ? { ...f, stock: Math.max(0, f.stock - qty) } : f
+  );
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -112,12 +121,27 @@ export const useStore = create<StoreState>((set, get) => ({
       alert('Por favor, selecione um sabor.');
       return false;
     }
+
+    // Confere se o sabor escolhido tem estoque suficiente
+    const flavorEntry = (Array.isArray(product.flavors) ? product.flavors : []).find((f) => f.name === flavor);
+    if (flavorEntry && flavorEntry.stock <= 0) {
+      alert('Esse sabor está esgotado.');
+      return false;
+    }
+
     let success = false;
     set((state) => {
       const prev = Array.isArray(state.cart) ? state.cart : [];
       const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
       const currentQtyInCart = existing ? existing.quantity : 0;
       const requestedTotal = currentQtyInCart + qty;
+
+      if (flavorEntry && requestedTotal > flavorEntry.stock) {
+        alert(`Só temos ${flavorEntry.stock} unidade(s) desse sabor em estoque.`);
+        success = false;
+        return state;
+      }
+
       success = true;
       const newCart = existing
         ? prev.map((c) => (c.product.id === product.id && c.selectedFlavor === flavor ? { ...c, quantity: requestedTotal } : c))
@@ -149,15 +173,21 @@ export const useStore = create<StoreState>((set, get) => ({
       .from('sales')
       .insert([{ amount, timestamp }]);
 
+    // Baixa o estoque APENAS do sabor vendido em cada item do carrinho
     for (const item of (Array.isArray(state.cart) ? state.cart : [])) {
       const product = item.product;
-      const newStock = Math.max(0, product.stock - item.quantity);
+      const updatedFlavors = decrementFlavorStock(product.flavors, item.selectedFlavor, item.quantity);
+      const newTotalStock = updatedFlavors.reduce((sum, f) => sum + f.stock, 0);
+
       set((prev) => ({
-        products: (Array.isArray(prev.products) ? prev.products : []).map((p) => (p.id === product.id ? { ...p, stock: newStock } : p))
+        products: (Array.isArray(prev.products) ? prev.products : []).map((p) =>
+          p.id === product.id ? { ...p, flavors: updatedFlavors, stock: newTotalStock } : p
+        ),
       }));
+
       await supabase
         .from('products')
-        .update({ stock: newStock })
+        .update({ flavors: updatedFlavors, stock: newTotalStock })
         .eq('id', product.id);
     }
 
@@ -170,6 +200,26 @@ export const useStore = create<StoreState>((set, get) => ({
           total_spent: amount,
         }
       ], { onConflict: 'phone' });
+    }
+  },
+
+  addProduct: async (product) => {
+    const tempId = Math.random().toString(36).slice(2);
+    const newProduct = { ...product, id: tempId } as Product;
+
+    // Mostra na tela na hora, mesmo antes do Supabase confirmar
+    set((prev) => ({ products: [...(Array.isArray(prev.products) ? prev.products : []), newProduct] }));
+
+    try {
+      const { data, error } = await supabase.from('products').insert([product]).select().single();
+      if (!error && data) {
+        // Troca o produto temporário pelo salvo de verdade (com o id real do banco)
+        set((prev) => ({
+          products: (Array.isArray(prev.products) ? prev.products : []).map((p) => (p.id === tempId ? data : p)),
+        }));
+      }
+    } catch (err) {
+      console.error('Erro ao cadastrar produto:', err);
     }
   },
 
