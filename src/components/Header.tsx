@@ -1,14 +1,15 @@
-import { Lock, Search, ShoppingBag } from 'lucide-react';
+import { Lock, Search, ShoppingBag, Star } from 'lucide-react';
 import { useStore } from '../store';
 
 interface Props {
   onOpenCart: () => void;
   onOpenAdmin: () => void;
+  onOpenPortal: () => void; // <-- Nova função para abrir o portal do cliente
   search: string;
   setSearch: (v: string) => void;
 }
 
-export function Header({ onOpenCart, onOpenAdmin, search, setSearch }: Props) {
+export function Header({ onOpenCart, onOpenAdmin, onOpenPortal, search, setSearch }: Props) {
   const { cartCount } = useStore();
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur">
@@ -38,6 +39,17 @@ export function Header({ onOpenCart, onOpenAdmin, search, setSearch }: Props) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {/* Botão do Clube de Fidelidade / Histórico */}
+          <button
+            onClick={onOpenPortal}
+            className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-line bg-white text-ink transition-all duration-300 hover:scale-105 hover:border-accent/40 active:scale-95 text-xs font-semibold shadow-sm"
+            aria-label="Clube de Fidelidade"
+            title="Meus Pontos e Pedidos"
+          >
+            <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+            <span className="hidden md:inline">Fidelidade</span>
+          </button>
+
           <button
             onClick={onOpenCart}
             className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-ink transition-all duration-300 hover:scale-105 hover:border-accent/40 active:scale-95"
@@ -50,6 +62,7 @@ export function Header({ onOpenCart, onOpenAdmin, search, setSearch }: Props) {
               </span>
             )}
           </button>
+          
           <button
             onClick={onOpenAdmin}
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-inkSoft transition-all duration-300 hover:scale-105 hover:border-ink/30 hover:text-ink active:scale-95"
