@@ -36,15 +36,18 @@ export const useStore = create<StoreState>((set, get) => ({
   fetchProducts: async () => {
     try {
       const { data, error } = await supabase.from('products').select('*');
-      if (!error && data) {
+      if (!error && Array.isArray(data)) {
         set({ products: data });
+      } else {
+        set({ products: [] });
       }
     } catch (err) {
       console.error('Erro ao buscar produtos:', err);
+      set({ products: [] });
     }
   },
 
-  setProducts: (products) => set({ products: products || [] }),
+  setProducts: (products) => set({ products: Array.isArray(products) ? products : [] }),
   setAuthed: (authed) => set({ isAuthed: authed }),
 
   addToCart: (product, qty = 1, flavor = '') => {
@@ -56,7 +59,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     let success = false;
     set((state) => {
-      const prev = state.cart || [];
+      const prev = Array.isArray(state.cart) ? state.cart : [];
       const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
       const currentQtyInCart = existing ? existing.quantity : 0;
       const requestedTotal = currentQtyInCart + qty;
@@ -90,12 +93,12 @@ export const useStore = create<StoreState>((set, get) => ({
       .from('sales')
       .insert([{ amount, timestamp }]);
 
-    for (const item of (state.cart || [])) {
+    for (const item of (Array.isArray(state.cart) ? state.cart : [])) {
       const product = item.product;
       const newStock = Math.max(0, product.stock - item.quantity);
 
       set((prev) => ({
-        products: (prev.products || []).map((p) => (p.id === product.id ? { ...p, stock: newStock } : p))
+        products: (Array.isArray(prev.products) ? prev.products : []).map((p) => (p.id === product.id ? { ...p, stock: newStock } : p))
       }));
 
       await supabase
