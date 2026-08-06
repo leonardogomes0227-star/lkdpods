@@ -10,14 +10,13 @@ import {
 import type { CartItem, Coupon, Product } from './types';
 import { storage } from './storage';
 import { supabase } from './supabase';
-import { logSecurityEvent } from './security';
+import { logSecurityEvent, sanitizeInput } from './security';
 
 export const ADMIN_CREDENTIALS = {
   email: 'admin@lkdimports.com',
   password: 'admin123',
 };
 
-// Variáveis de controle de tentativa de força bruta (Rate Limiting)
 let failedLoginAttempts = 0;
 let lockoutUntil = 0;
 
@@ -44,7 +43,7 @@ interface StoreContextValue {
   monthlyTotal: number;
   recordSale: (amount: number) => void;
 
-  addToCart: (product: Product, qty?: number, flavor?: string) => void;
+  addToCart: (product: Product, qty?: number, flavor?: string) => boolean;
   removeFromCart: (productId: string, flavor: string) => void;
   setQty: (productId: string, flavor: string, qty: number) => void;
   clearCart: () => void;
@@ -76,6 +75,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [couponCode, setCouponCode] = useState<string | null>(null);
   const [isAuthed, setIsAuthed] = useState<boolean>(() => storage.isAuthed());
   const [flashDeadline, setFlashDeadline] = useState<number>(() => storage.getFlashDeadline());
+
+  // === EXPIRAÇÃO DE SESSÃO POR INATIVIDADE (15 Minutos) ===
+  useEffect(() => {
+    if (!isAuthed) return;
+
+    let inactivityTimer: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer);
+      // 15 minutos = 15 * 60 * 1000 ms
+      inactivityTimer = setTimeout(() => {
+        storage.setAuthed(false);
+        setIsAuthed(false);
+        logSecurityEvent('ADMIN_TIMEOUT', 'Sessão encerrada automaticamente por inatividade.');
+        alert('Sua sessão expirou por inatividade por motivos de segurança.');
+        window.location.reload();
+      }, 15 * 60 * 1000);
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'touchstart'];
+    events.forEach((event) => window.addEventListener(event, resetTimer));
+    resetTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      events.forEach((event) => window.removeEventListener(event, resetTimer));
+    };
+  }, [isAuthed]);
 
   useEffect(() => {
     async function loadDataFromCloud() {
@@ -137,9 +164,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addProduct = useCallback(async (p: Omit<Product, 'id' | 'views'>) => {
+    const safeName = sanitizeInput(p.name);
+    const safeBrand = sanitizeInput(p.brand);
+    const safeFlavor = sanitizeInput(p.flavor || '');
+
+    if (!safeName || !safeBrand) {
+      alert('Preencha os campos obrigatórios corretamente.');
+      return;
+    }
+
     supabase
       .from('products')
-      .insert([{ ...p, views: Math.floor(Math.random() * 8) + 1, featured: false }])
+      .insert([{ ...p, name: safeName, brand: safeBrand, flavor: safeFlavor, views: Math.floor(Math.random() * 8) + 1, featured: false }])
       .select()
       .then(async ({ data, error }) => {
         if (error) {
@@ -147,14 +183,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           alert('Erro ao salvar no banco: ' + error.message);
         } else if (data && data.length > 0) {
           setProducts((prev) => [data[0], ...prev]);
-          await logSecurityEvent('PRODUCT_CREATED', `Produto criado: ${p.name} (Marca: ${p.brand})`);
+          await logSecurityEvent('PRODUCT_CREATED', `Produto criado: ${safeName}`);
         }
       });
   }, []);
 
   const updateProduct = useCallback((id: string, patch: Partial<Product>) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-    supabase.from('products').update(patch).eq('id', id);
+    const sanitizedPatch: Partial<Product> = { ...patch };
+    if (sanitizedPatch.name) sanitizedPatch.name = sanitizeInput(sanitizedPatch.name);
+    if (sanitizedPatch.brand) sanitizedPatch.brand = sanitizeInput(sanitizedPatch.brand);
+
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...sanitizedPatch } : p)));
+    supabase.from('products').update(sanitizedPatch).eq('id', id);
   }, []);
 
   const deleteProduct = useCallback(async (id: string) => {
@@ -164,16 +204,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addCoupon = useCallback(async (code: string, discountPercent: number) => {
-    const exists = coupons.some((c) => c.code.toUpperCase() === code.trim().toUpperCase());
+    const cleanCode = sanitizeInput(code).toUpperCase();
+    const exists = coupons.some((c) => c.code.toUpperCase() === cleanCode);
+
     if (exists) return { ok: false, message: 'Já existe um cupom com esse código.' };
     if (discountPercent <= 0 || discountPercent > 100)
       return { ok: false, message: 'Desconto deve ser entre 1% e 100%.' };
 
-    const formattedCode = code.trim().toUpperCase();
-
     supabase
       .from('coupons')
-      .insert([{ code: formattedCode, discount_percent: discountPercent, active: true }])
+      .insert([{ code: cleanCode, discount_percent: discountPercent, active: true }])
       .select()
       .single()
       .then(async ({ data }) => {
@@ -182,7 +222,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...prev,
             { id: data.id, code: data.code, discountPercent: data.discount_percent, active: data.active },
           ]);
-          await logSecurityEvent('COUPON_CREATED', `Cupom criado: ${formattedCode} (${discountPercent}%)`);
+          await logSecurityEvent('COUPON_CREATED', `Cupom criado: ${cleanCode} (${discountPercent}%)`);
         }
       });
       
@@ -205,18 +245,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     supabase.from('coupons').delete().eq('id', id);
   }, []);
 
+  // === VALIDAÇÃO DE ESTOQUE ESTRITA NO CARRINHO ===
   const addToCart = useCallback((product: Product, qty = 1, flavor = '') => {
+    if (qty <= 0) return false;
+
+    let success = false;
     setCart((prev) => {
       const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
+      const currentQtyInCart = existing ? existing.quantity : 0;
+      const requestedTotal = currentQtyInCart + qty;
+
+      // Trava estrita de estoque
+      if (requestedTotal > product.stock) {
+        alert(`Estoque indisponível. Temos apenas ${product.stock} unidades em estoque.`);
+        return prev;
+      }
+
+      success = true;
       if (existing) {
         return prev.map((c) =>
           c.product.id === product.id && c.selectedFlavor === flavor 
-            ? { ...c, quantity: c.quantity + qty } 
+            ? { ...c, quantity: requestedTotal } 
             : c,
         );
       }
       return [...prev, { product, quantity: qty, selectedFlavor: flavor }];
     });
+    return success;
   }, []);
 
   const removeFromCart = useCallback((productId: string, flavor: string) => {
@@ -224,12 +279,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setQty = useCallback((productId: string, flavor: string, qty: number) => {
-    setCart((prev) =>
-      prev
-        .map((c) => (c.product.id === productId && c.selectedFlavor === flavor ? { ...c, quantity: Math.max(0, qty) } : c))
-        .filter((c) => c.quantity > 0),
-    );
-  }, []);
+    if (qty <= 0) {
+      removeFromCart(productId, flavor);
+      return;
+    }
+
+    setCart((prev) => {
+      const targetProduct = products.find((p) => p.id === productId);
+      if (targetProduct && qty > targetProduct.stock) {
+        alert(`Quantidade máxima em estoque é de ${targetProduct.stock} unidades.`);
+        return prev;
+      }
+
+      return prev.map((c) =>
+        c.product.id === productId && c.selectedFlavor === flavor ? { ...c, quantity: qty } : c
+      );
+    });
+  }, [products, removeFromCart]);
 
   const clearCart = useCallback(() => {
     setCart([]);
@@ -250,7 +316,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const cartCount = useMemo(() => cart.reduce((s, c) => s + c.quantity, 0), [cart]);
 
   const applyCoupon = useCallback((code: string) => {
-    const found = coupons.find((c) => c.code.toUpperCase() === code.trim().toUpperCase());
+    const cleanCode = sanitizeInput(code).toUpperCase();
+    const found = coupons.find((c) => c.code.toUpperCase() === cleanCode);
     if (!found) return { ok: false, message: 'Cupom não encontrado.' };
     if (!found.active) return { ok: false, message: 'Este cupom está inativo.' };
     setCouponCode(found.code);
@@ -259,7 +326,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const removeCoupon = useCallback(() => setCouponCode(null), []);
 
-  // === LOGIN BLINDADO COM RATE LIMITING E AUDITORIA ===
   const login = useCallback(async (email: string, password: string) => {
     const now = Date.now();
     
@@ -269,14 +335,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    if (email.trim().toLowerCase() === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+    const cleanEmail = sanitizeInput(email).toLowerCase();
+
+    if (cleanEmail === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
       failedLoginAttempts = 0;
       lockoutUntil = 0;
 
       storage.setAuthed(true);
       setIsAuthed(true);
 
-      await logSecurityEvent('ADMIN_LOGIN_SUCCESS', `Login bem-sucedido com o e-mail: ${email}`);
+      await logSecurityEvent('ADMIN_LOGIN_SUCCESS', `Login bem-sucedido com o e-mail: ${cleanEmail}`);
       return true;
     } else {
       failedLoginAttempts += 1;
@@ -286,7 +354,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         failedLoginAttempts = 0;
         await logSecurityEvent('ADMIN_LOCKOUT', 'Painel bloqueado temporariamente por excesso de tentativas de login falhas.');
       } else {
-        await logSecurityEvent('ADMIN_LOGIN_FAILED', `Tentativa de login falha com o e-mail: ${email} (Tentativa ${failedLoginAttempts}/5)`);
+        await logSecurityEvent('ADMIN_LOGIN_FAILED', `Tentativa de login falha com o e-mail: ${cleanEmail} (Tentativa ${failedLoginAttempts}/5)`);
       }
 
       return false;
