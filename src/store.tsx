@@ -1,5 +1,34 @@
-// === ADICIONAR AO CARRINHO COM VALIDAÇÃO DE ESTOQUE POR SABOR ===
-  const addToCart = useCallback((product: Product, qty = 1, flavor = '') => {
+import { create } from 'zustand';
+import { supabase } from './supabaseClient'; // ou o caminho do seu cliente supabase
+import type { Product, CartItem, Sale } from './types';
+
+interface StoreState {
+  products: Product[];
+  cart: CartItem[];
+  sales: Sale[];
+  cartCount: number;
+  subtotal: number;
+  discount: number;
+  total: number;
+  appliedCoupon: any;
+  addToCart: (product: Product, qty?: number, flavor?: string) => boolean;
+  recordSale: (amount: number, customerInfo?: { name: string; phone: string }) => Promise<void>;
+  clearCart: () => void;
+  // ... outras funções e estados do seu projeto ...
+}
+
+export const useStore = create<StoreState>((set, get) => ({
+  products: [],
+  cart: [],
+  sales: [],
+  cartCount: 0,
+  subtotal: 0,
+  discount: 0,
+  total: 0,
+  appliedCoupon: null,
+
+  // Cole aqui a sua função addToCart
+  addToCart: (product, qty = 1, flavor = '') => {
     if (qty <= 0) return false;
     if (!flavor) {
       alert('Por favor, selecione um sabor.');
@@ -7,56 +36,55 @@
     }
 
     let success = false;
-    setCart((prev) => {
+    set((state) => {
+      const prev = state.cart;
       const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
       const currentQtyInCart = existing ? existing.quantity : 0;
       const requestedTotal = currentQtyInCart + qty;
 
-      // Nota: Aqui o estoque do sabor pode ser validado. 
-      // Se você guarda os sabores no formato string ou objeto, validamos aqui.
       success = true;
-      if (existing) {
-        return prev.map((c) =>
-          c.product.id === product.id && c.selectedFlavor === flavor 
-            ? { ...c, quantity: requestedTotal } 
-            : c,
-        );
-      }
-      return [...prev, { product, quantity: qty, selectedFlavor: flavor }];
+      const newCart = existing
+        ? prev.map((c) => (c.product.id === product.id && c.selectedFlavor === flavor ? { ...c, quantity: requestedTotal } : c))
+        : [...prev, { product, quantity: qty, selectedFlavor: flavor }];
+      
+      const newCount = newCart.reduce((sum, item) => sum + item.quantity, 0);
+      const newSubtotal = newCart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+
+      return {
+        cart: newCart,
+        cartCount: newCount,
+        subtotal: newSubtotal,
+        total: newSubtotal - state.discount,
+      };
     });
     return success;
-  }, []);
+  },
 
-  // === FLUXO AUTOMÁTICO AO FINALIZAR VENDA (Baixa no estoque e Registro) ===
-  const recordSale = useCallback(async (amount: number, customerInfo?: { name: string; phone: string }) => {
+  // Cole aqui a sua função recordSale
+  recordSale: async (amount, customerInfo) => {
     const timestamp = Date.now();
     const tempId = Math.random().toString();
+    const state = get();
     
-    // 1. Registra a venda localmente
-    setSales((prev) => [...prev, { id: tempId, amount, timestamp }]);
+    set((prev) => ({ sales: [...prev.sales, { id: tempId, amount, timestamp }] }));
 
-    // 2. Grava a venda na nuvem (Supabase)
     await supabase
       .from('sales')
       .insert([{ amount, timestamp }]);
 
-    // 3. Processa cada item do carrinho para dar baixa no estoque e atualizar histórico do cliente
-    for (const item of cart) {
+    for (const item of state.cart) {
       const product = item.product;
       const newStock = Math.max(0, product.stock - item.quantity);
 
-      // Atualiza o estoque geral do produto na tela
-      setProducts((prev) => 
-        prev.map((p) => (p.id === product.id ? { ...p, stock: newStock } : p))
-      );
+      set((prev) => ({
+        products: prev.products.map((p) => (p.id === product.id ? { ...p, stock: newStock } : p))
+      }));
 
-      // Atualiza no Supabase
       await supabase
         .from('products')
         .update({ stock: newStock })
         .eq('id', product.id);
 
-      // Alerta se o produto/sabor esgotou
       if (newStock === 0) {
         await supabase.from('audit_logs').insert([{
           action: 'OUT_OF_STOCK',
@@ -66,7 +94,6 @@
       }
     }
 
-    // 4. Se houver dados do cliente, salva/atualiza no Cadastro Inteligente de Clientes
     if (customerInfo && customerInfo.phone) {
       await supabase.from('customers').upsert([
         {
@@ -74,9 +101,10 @@
           name: customerInfo.name.trim(),
           last_purchase: timestamp,
           total_spent: amount,
-          // O histórico completo pode ser alimentado em uma tabela de pedidos vinculada ao telefone
         }
       ], { onConflict: 'phone' });
     }
+  },
 
-  }, [cart]);
+  clearCart: () => set({ cart: [], cartCount: 0, subtotal: 0, total: 0, discount: 0, appliedCoupon: null }),
+}));
