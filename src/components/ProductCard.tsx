@@ -1,17 +1,34 @@
 import { ShoppingBag } from 'lucide-react';
 import type { Product } from '../types';
 import { formatBRL } from '../utils';
+import { useState } from 'react';
+import { useStore } from '../store';
 
 interface Props {
   product: Product;
-  onAdd: (p: Product) => void;
+  onAdd?: (p: Product, qty: number, flavor: string) => void;
 }
 
-export function ProductCard({ product, onAdd }: Props) {
+export function ProductCard({ product }: Props) {
+  const { addToCart } = useStore();
+  
+  // Divide os sabores separados por vírgula para montar as opções
+  const flavorList = product.flavor ? product.flavor.split(',').map((f) => f.trim()).filter(Boolean) : ['Padrão'];
+  const [selectedFlavor, setSelectedFlavor] = useState<string>(flavorList[0] || '');
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Evita conflito com o clique do card geral
+    if (product.stock === 0) return;
+    
+    const success = addToCart(product, 1, selectedFlavor);
+    if (success) {
+      alert(`"${product.name}" (${selectedFlavor}) adicionado à sacola!`);
+    }
+  };
+
   return (
     <div 
-      onClick={() => onAdd(product)} 
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-3xl border border-line bg-white p-4 transition-all hover:-translate-y-1 hover:shadow-xl"
+      className="group relative flex flex-col overflow-hidden rounded-3xl border border-line bg-white p-4 transition-all hover:-translate-y-1 hover:shadow-xl"
     >
       {/* Imagem Real ou Gradient com Emoji */}
       <div className={`relative mb-4 flex h-48 items-center justify-center rounded-2xl bg-gradient-to-br ${product.gradient} overflow-hidden transition-transform duration-500 group-hover:scale-[1.02]`}>
@@ -40,15 +57,32 @@ export function ProductCard({ product, onAdd }: Props) {
         <span className="mb-1 text-xs font-bold uppercase tracking-wider text-inkSoft">{product.brand}</span>
         <h3 className="font-display text-lg font-bold leading-tight text-ink">{product.name}</h3>
         
-        <p className="mt-1 line-clamp-1 text-xs font-medium text-inkSoft">
-          {product.flavor.split(',').join(' • ')}
-        </p>
+        {/* Seletor de Sabores */}
+        <div className="mt-3">
+          <label className="block text-[11px] font-semibold text-inkSoft uppercase mb-1">
+            Selecione o Sabor:
+          </label>
+          <select
+            value={selectedFlavor}
+            onChange={(e) => setSelectedFlavor(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full rounded-xl border border-line bg-neutral-50 py-2 px-3 text-xs text-ink outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/30 font-medium"
+          >
+            {flavorList.map((flav, idx) => (
+              <option key={idx} value={flav}>
+                {flav}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="mt-4 flex items-end justify-between">
           <span className="text-xl font-bold text-accent">{formatBRL(product.price)}</span>
           <button 
+            onClick={handleAddToCart}
             disabled={product.stock === 0}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-bgAlt text-ink transition-colors hover:bg-accent hover:text-white disabled:opacity-50 disabled:hover:bg-bgAlt disabled:hover:text-ink"
+            title={product.stock === 0 ? 'Produto Esgotado' : 'Adicionar à Sacola'}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-bgAlt text-ink transition-colors hover:bg-accent hover:text-white disabled:opacity-50 disabled:hover:bg-bgAlt disabled:hover:text-ink shadow-sm active:scale-95"
           >
             <ShoppingBag className="h-4 w-4" />
           </button>
