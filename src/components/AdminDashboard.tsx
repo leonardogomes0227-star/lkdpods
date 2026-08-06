@@ -9,6 +9,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Star, // <-- Ícone de estrela adicionado
   Tag,
   Trash2,
   TrendingUp,
@@ -30,14 +31,15 @@ export function AdminDashboard({ onExit }: Props) {
     products,
     coupons,
     deleteProduct,
+    updateProduct, // <-- ADICIONADO AQUI PARA PODER MARCAR O DESTAQUE
     addCoupon,
     toggleCoupon,
     deleteCoupon,
     logout,
     resetFlash,
-    dailyTotal,   // <-- PUXANDO O TOTAL DO DIA
-    weeklyTotal,  // <-- PUXANDO O TOTAL DA SEMANA
-    monthlyTotal, // <-- PUXANDO O TOTAL DO MÊS
+    dailyTotal,
+    weeklyTotal,
+    monthlyTotal,
   } = useStore();
 
   const [tab, setTab] = useState<Tab>('produtos');
@@ -97,6 +99,17 @@ export function AdminDashboard({ onExit }: Props) {
     onExit();
   };
 
+  // FUNÇÃO PARA DEFINIR O PRODUTO EM DESTAQUE NA HOME
+  const handleToggleFeatured = (productId: string) => {
+    products.forEach((p) => {
+      if (p.id === productId) {
+        updateProduct(p.id, { featured: !p.featured });
+      } else if (p.featured) {
+        updateProduct(p.id, { featured: false }); // Garante apenas um em destaque
+      }
+    });
+  };
+
   return (
     <div className="min-h-screen bg-bg">
       {/* Top bar */}
@@ -127,11 +140,10 @@ export function AdminDashboard({ onExit }: Props) {
 
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         
-        {/* NOVA SEÇÃO DE FECHAMENTO FINANCEIRO - AGORA COM DADOS REAIS! */}
+        {/* VISÃO GERAL DE VENDAS */}
         <div className="mb-6">
           <h2 className="mb-4 font-display text-lg font-bold text-ink">Visão Geral (Fechamento)</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            
             <div className="rounded-2xl border border-line bg-white p-5 shadow-sm transition-transform hover:-translate-y-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 text-inkSoft">
@@ -170,11 +182,10 @@ export function AdminDashboard({ onExit }: Props) {
               <p className="mt-4 font-display text-3xl font-bold text-ink">{formatBRL(monthlyTotal)}</p>
               <p className="mt-1 text-xs text-inkSoft">Mês Atual</p>
             </div>
-
           </div>
         </div>
 
-        {/* Metrics do Estoque */}
+        {/* METRICS */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
           <MetricCard icon={<Package className="h-5 w-5" />} label="Produtos" value={String(metrics.totalProducts)} accent="neon" />
           <MetricCard icon={<DollarSign className="h-5 w-5" />} label="Valor em estoque" value={formatBRL(metrics.stockValue)} accent="electric" />
@@ -183,7 +194,7 @@ export function AdminDashboard({ onExit }: Props) {
           <MetricCard icon={<Boxes className="h-5 w-5" />} label="Estoque crítico" value={String(metrics.lowStock)} accent="danger" />
         </div>
 
-        {/* Flash reset */}
+        {/* FLASH RESET */}
         <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3 shadow-sm">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-red-500" />
@@ -196,7 +207,7 @@ export function AdminDashboard({ onExit }: Props) {
           </button>
         </div>
 
-        {/* Tabs */}
+        {/* TABS */}
         <div className="mt-6 flex gap-2">
           <TabButton active={tab === 'produtos'} onClick={() => setTab('produtos')}>
             <Package className="h-4 w-4" /> Produtos
@@ -206,7 +217,7 @@ export function AdminDashboard({ onExit }: Props) {
           </TabButton>
         </div>
 
-        {/* Content */}
+        {/* CONTENT */}
         {tab === 'produtos' ? (
           <div className="mt-4">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -227,9 +238,8 @@ export function AdminDashboard({ onExit }: Props) {
               </button>
             </div>
 
-            {/* Table (desktop) / cards (mobile) */}
+            {/* TABELA DE PRODUTOS */}
             <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
-              {/* Desktop table */}
               <div className="hidden md:block">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-line bg-bgAlt text-xs uppercase tracking-wide text-inkSoft">
@@ -251,7 +261,14 @@ export function AdminDashboard({ onExit }: Props) {
                               {p.emoji}
                             </div>
                             <div>
-                              <p className="font-semibold text-ink">{p.brand} {p.name}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-semibold text-ink">{p.brand} {p.name}</p>
+                                {p.featured && (
+                                  <span className="rounded-full bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold text-amber-700">
+                                    ⭐ Destaque
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-inkSoft">{p.flavor}</p>
                             </div>
                           </div>
@@ -266,6 +283,19 @@ export function AdminDashboard({ onExit }: Props) {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
+                            {/* Botão de Estrela (Destacar na Home) */}
+                            <button
+                              onClick={() => handleToggleFeatured(p.id)}
+                              title={p.featured ? 'Remover destaque da Home' : 'Destacar na Home'}
+                              className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                                p.featured
+                                  ? 'border-amber-300 bg-amber-50 text-amber-500'
+                                  : 'border-line text-inkSoft hover:border-amber-200 hover:text-amber-500 hover:bg-amber-50/50'
+                              }`}
+                            >
+                              <Star className={`h-3.5 w-3.5 ${p.featured ? 'fill-amber-500' : ''}`} />
+                            </button>
+
                             <button onClick={() => handleEdit(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:border-accent hover:text-accent hover:bg-accentSoft">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -281,7 +311,7 @@ export function AdminDashboard({ onExit }: Props) {
                 {filtered.length === 0 && <p className="py-12 text-center text-inkSoft">Nenhum produto encontrado.</p>}
               </div>
 
-              {/* Mobile cards */}
+              {/* MOBILE CARDS */}
               <div className="divide-y divide-line md:hidden">
                 {filtered.map((p) => (
                   <div key={p.id} className="flex items-center gap-3 p-4 hover:bg-bgAlt/50 transition">
@@ -289,7 +319,14 @@ export function AdminDashboard({ onExit }: Props) {
                       {p.emoji}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="truncate font-semibold text-ink">{p.brand} {p.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate font-semibold text-ink">{p.brand} {p.name}</p>
+                        {p.featured && (
+                          <span className="rounded-full bg-amber-100 px-1 py-0.2 text-[9px] font-bold text-amber-700">
+                            ⭐
+                          </span>
+                        )}
+                      </div>
                       <p className="truncate text-xs text-inkSoft">{p.flavor} · {p.category}</p>
                       <div className="mt-1 flex items-center gap-2">
                         <span className="text-sm font-bold text-accent">{formatBRL(p.price)}</span>
@@ -299,6 +336,16 @@ export function AdminDashboard({ onExit }: Props) {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleToggleFeatured(p.id)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                          p.featured
+                            ? 'border-amber-300 bg-amber-50 text-amber-500'
+                            : 'border-line text-inkSoft'
+                        }`}
+                      >
+                        <Star className={`h-3.5 w-3.5 ${p.featured ? 'fill-amber-500' : ''}`} />
+                      </button>
                       <button onClick={() => handleEdit(p)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-inkSoft transition hover:bg-accentSoft hover:text-accent">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -314,7 +361,7 @@ export function AdminDashboard({ onExit }: Props) {
           </div>
         ) : (
           <div className="mt-4">
-            {/* Add coupon */}
+            {/* CUPONS */}
             <div className="mb-4 rounded-2xl border border-line bg-white p-4 shadow-sm">
               <p className="mb-3 text-sm font-semibold text-ink">Cadastrar novo cupom</p>
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -342,7 +389,6 @@ export function AdminDashboard({ onExit }: Props) {
               )}
             </div>
 
-            {/* Coupon list */}
             <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-line bg-bgAlt text-xs uppercase tracking-wide text-inkSoft">
