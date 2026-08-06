@@ -1,50 +1,79 @@
-export type Category = 'Pods Descartáveis' | 'Vapes Recarregáveis' | 'Essências' | 'Acessórios';
+// Adicione essas funções/tipos na interface StoreContextValue e na StoreProvider:
 
-export interface Product {
+export interface CustomerOrder {
   id: string;
-  name: string;
-  brand: string;
-  category: Category;
-  flavor: string;
-  description?: string;
-  price: number;
-  cost: number;
-  stock: number;
-  views: number;
-  emoji: string;
-  gradient: string;
-  image?: string;
-  featured?: boolean;
+  phone: string;
+  items: { productName: string; quantity: number; flavor: string; price: number }[];
+  total: number;
+  status: string;
+  created_at: string;
 }
 
-export interface Coupon {
-  id: string;
-  code: string;
-  discountPercent: number;
-  active: boolean;
-}
+// 1. Função para buscar o histórico e pontos do cliente pelo WhatsApp
+const lookupCustomer = async (phone: string) => {
+  const cleanPhone = phone.replace(/\D/g, '');
+  
+  // Busca dados de pontos
+  const { data: customerData } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('phone', cleanPhone)
+    .single();
 
-export interface CartItem {
-  product: Product;
-  quantity: number;
-  selectedFlavor: string;
-}
+  // Busca histórico de pedidos do número
+  const { data: ordersData } = await supabase
+    .from('customer_orders')
+    .select('*')
+    .eq('phone', cleanPhone)
+    .order('created_at', { ascending: false });
 
-export type PaymentMethod = 'PIX' | 'Cartão' | 'Dinheiro';
+  return {
+    customer: customerData || { name: '', points: 0 },
+    orders: ordersData || []
+  };
+};
 
-export interface CheckoutInfo {
-  name: string;
-  phone: string; // <--- O TELEFONE ESTÁ AQUI AGORA!
-  address: string;
-  number: string;
-  district: string;
-  reference: string;
-  payment: PaymentMethod | null;
-  troco: string;
-  deliveryFee: number;
-}
+// 2. Na hora de finalizar o pedido no Checkout (quando o cliente conclui a compra):
+const saveCustomerOrder = async (info: CheckoutInfo, cartItems: CartItem[], totalAmount: number) => {
+  const cleanPhone = info.phone.replace(/\D/g, '');
+  
+  // Verifica se o cliente já existe, se não, cadastra com o nome e ganha pontos iniciais
+  const { data: existing } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('phone', cleanPhone)
+    .single();
 
-export interface AdminUser {
-  email: string;
-  password: string;
-}
+  const earnedPoints = Math.floor(totalAmount / 10); // Ex: 1 ponto a cada R$ 10 gastos
+
+  if (!existing) {
+    await supabase.from('customers').insert([
+      { phone: cleanPhone, name: info.name, points: earnedPoints }
+    ]);
+  } else {
+    await supabase
+      .from('customers')
+      .update({ points: (existing.points || 0) + earnedPoints })
+      .eq('phone', cleanPhone);
+  }
+
+  // Salva o pedido no histórico do cliente
+  const formattedItems = cartItems.map(item => ({
+    productName: item.product.name,
+    quantity: item.quantity,
+    flavor: item.selectedFlavor,
+    price: item.product.price
+  }));
+
+  await supabase.from('customer_orders').insert([
+    {
+      phone: cleanPhone,
+      items: formattedItems,
+      total: totalAmount,
+      status: 'Recebido'
+    }
+  ]);
+
+  // Registra também no fechamento geral da loja que você já tem
+  recordSale(totalAmount);
+};
