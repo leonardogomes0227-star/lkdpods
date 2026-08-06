@@ -1,126 +1,182 @@
-import { useMemo, useState } from 'react';
-import { PackageSearch, SlidersHorizontal } from 'lucide-react';
-import type { Category, Product } from '../types';
-import { useStore } from '../store';
-import { ProductCard } from './ProductCard';
-import { Reveal } from './Reveal';
+import { useState, useEffect } from 'react';
+import { Check, Flame, Instagram, MessageCircle, Truck } from 'lucide-react';
+import { useStore } from './store';
+import { AnimatedBackground } from './components/AnimatedBackground';
+import { FlashBanner } from './components/FlashBanner';
+import { Header } from './components/Header';
+import { Hero } from './components/Hero';
+import { ProductGrid } from './components/ProductGrid';
+import { Reveal } from './components/Reveal';
+import { CartDrawer } from './components/CartDrawer';
+import { CheckoutModal } from './components/CheckoutModal';
+import { AdminLogin } from './components/AdminLogin';
+import { AdminDashboard } from './components/AdminDashboard';
+import { ProductModal } from './components/ProductModal';
+import { CustomerPortalModal } from './components/CustomerPortalModal';
+import type { Product } from './types';
 
-const CATEGORIES: (Category | 'Todos')[] = [
-  'Todos',
-  'Pods Descartáveis',
-  'Vapes Recarregáveis',
-  'Essências',
-  'Acessórios',
-];
-
-interface Props {
-  onAdd: (p: Product) => void;
-  query: string;
+function Toast({ message }: { message: string }) {
+  return (
+    <div className="fixed bottom-5 left-1/2 z-[100] -translate-x-1/2 animate-slide-up">
+      <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-3 shadow-lg">
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-accent">
+          <Check className="h-4 w-4 text-white" />
+        </div>
+        <p className="text-sm font-semibold text-ink">{message}</p>
+      </div>
+    </div>
+  );
 }
 
-export function ProductGrid({ onAdd, query }: Props) {
-  const { products } = useStore();
-  const [cat, setCat] = useState<Category | 'Todos'>('Todos');
-  const [sort, setSort] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
+function Footer() {
+  return (
+    <footer className="relative border-t border-line bg-bg">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <div className="grid gap-8 md:grid-cols-3">
+          <Reveal>
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink font-display text-lg font-bold text-white shadow-sm">
+                  L
+                </div>
+                <p className="font-display text-lg font-bold text-ink">
+                  LKD <span className="text-accent">Imports</span>
+                </p>
+              </div>
+              <p className="mt-3 max-w-xs text-sm font-light leading-relaxed text-inkSoft">
+                Tabacaria underground com os pods, vapes, essências e acessórios mais desejados.
+                Entrega rápida e exclusiva para nossa cidade.
+              </p>
+            </div>
+          </Reveal>
 
-  const filtered = useMemo(() => {
-    const safe = Array.isArray(products) ? products : [];
-    let list = safe.filter((p) => {
-      if (!p) return false;
-      const matchesCat = cat === 'Todos' || p.category === cat;
-      const q = (query ?? '').trim().toLowerCase();
-      const matchesQuery =
-        !q ||
-        (p.name ?? '').toLowerCase().includes(q) ||
-        (p.brand ?? '').toLowerCase().includes(q) ||
-        (p.flavor ?? '').toLowerCase().includes(q);
-      return matchesCat && matchesQuery;
-    });
-    if (sort === 'price-asc') list = [...list].sort((a, b) => a.price - b.price);
-    if (sort === 'price-desc') list = [...list].sort((a, b) => b.price - a.price);
-    if (sort === 'featured')
-      list = [...list].sort(
-        (a, b) => Number(!!b.featured) - Number(!!a.featured) || b.views - a.views,
-      );
-    return list;
-  }, [products, query, cat, sort]);
+          <Reveal delay={80}>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-inkSoft">
+                Atendimento
+              </p>
+              <ul className="space-y-2 text-sm font-light text-ink">
+                <li className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-accent" /> Entrega local rápida
+                </li>
+                <li className="flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4 text-accent" /> Pedidos via WhatsApp
+                </li>
+                <li className="flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-red-500" /> Promoções relâmpago diárias
+                </li>
+              </ul>
+            </div>
+          </Reveal>
+
+          <Reveal delay={160}>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-inkSoft">
+                Redes
+              </p>
+              <div className="flex gap-2">
+                <a
+                  href="https://www.instagram.com/lkd_importes?igsh=cm45M2VnMzQ2czhk&utm_source=qr"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-ink transition-all duration-300 hover:scale-110 hover:border-accent/40 hover:text-accent active:scale-95"
+                >
+                  <Instagram className="h-5 w-5" />
+                </a>
+                <a
+                  href="#"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-ink transition-all duration-300 hover:scale-110 hover:border-accent/40 hover:text-accent active:scale-95"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                </a>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+
+        <div className="mt-8 border-t border-line pt-6 text-center text-xs font-light text-inkSoft">
+          LKD Imports — Tabacaria & Vapes. Produtos para maiores de 18 anos. &copy; {new Date().getFullYear()}
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+export default function App() {
+  const { flashDeadline, isAuthed, addToCart, fetchProducts } = useStore();
+  
+  const [cartOpen, setCartOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productModalOpen, setProductModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  const handleProductClick = (p: Product) => {
+    setSelectedProduct(p);
+    setProductModalOpen(true);
+  };
+
+  if (isAuthed) {
+    return <AdminDashboard onExit={() => window.location.reload()} />;
+  }
 
   return (
-    <section id="vitrine" className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20">
-      <Reveal>
-        <div className="mb-8">
-          <p className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">
-            Vitrine
-          </p>
-          <h2 className="font-display text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
-            Produtos em destaque
-          </h2>
-          <p className="mt-1.5 text-sm text-inkSoft">
-            Estoque rotativo — quando acaba, acaba. Garanta o seu.
-          </p>
-        </div>
-      </Reveal>
+    <div id="top" className="relative min-h-screen bg-bg">
+      <AnimatedBackground />
+      <div className="relative z-10">
+        <FlashBanner deadline={flashDeadline} />
+        <Header
+          onOpenCart={() => setCartOpen(true)}
+          onOpenAdmin={() => setAdminLoginOpen(true)}
+          onOpenPortal={() => setPortalOpen(true)}
+          search={search}
+          setSearch={setSearch}
+        />
+        <Hero />
+        <ProductGrid onAdd={handleProductClick} query={search} />
+        <Footer />
+      </div>
 
-      <Reveal delay={60}>
-        <div className="mb-6 flex items-center justify-between gap-2">
-          <p className="text-sm text-inkSoft">
-            <span className="font-semibold text-ink">{filtered.length}</span> produto(s)
-          </p>
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-inkSoft" />
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as typeof sort)}
-              className="rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-accent/50"
-            >
-              <option value="featured">Destaques</option>
-              <option value="price-asc">Menor preço</option>
-              <option value="price-desc">Maior preço</option>
-            </select>
-          </div>
-        </div>
-      </Reveal>
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        onCheckout={() => {
+          setCartOpen(false);
+          setCheckoutOpen(true);
+        }}
+      />
+      <CheckoutModal
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        onDone={() => setCheckoutOpen(false)}
+      />
+      
+      <ProductModal
+        product={selectedProduct}
+        isOpen={productModalOpen}
+        onClose={() => setProductModalOpen(false)}
+        onAddToCart={(product, flavor, qty) => {
+          addToCart(product, qty, flavor);
+          setToast(`${qty}x ${product.name} (${flavor}) adicionado!`);
+          setTimeout(() => setToast(null), 2500);
+        }}
+      />
 
-      <Reveal delay={100}>
-        <div className="mb-8 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCat(c)}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 hover:scale-105 active:scale-95 ${
-                cat === c
-                  ? 'bg-ink text-white'
-                  : 'border border-line bg-white text-inkSoft hover:border-accent/40 hover:text-ink'
-              }`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      </Reveal>
+      <CustomerPortalModal
+        isOpen={portalOpen}
+        onClose={() => setPortalOpen(false)}
+      />
 
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-white py-20 text-center">
-          <PackageSearch className="h-10 w-10 text-line" />
-          <p className="text-sm text-inkSoft">
-            Nenhum produto encontrado para sua busca.
-          </p>
-          <button
-            onClick={() => { setCat('Todos'); }}
-            className="mt-1 rounded-lg border border-line px-4 py-2 text-xs font-semibold text-inkSoft transition hover:border-accent/40 hover:text-ink"
-          >
-            Limpar filtros
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          {filtered.map((p, i) => (
-            <Reveal key={p.id ?? i} delay={Math.min(i * 60, 480)}>
-              <ProductCard product={p} onAdd={onAdd} />
-            </Reveal>
-          ))}
-        </div>
-      )}
-    </section>
+      {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} />}
+      {toast && <Toast message={toast} />}
+    </div>
   );
 }
