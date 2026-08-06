@@ -4,7 +4,7 @@ import { useStore } from '../store';
 interface Props {
   onOpenCart: () => void;
   onOpenAdmin: () => void;
-  onOpenPortal: () => void; // <-- Nova função para abrir o portal do cliente
+  onOpenPortal: () => void;
   search: string;
   setSearch: (v: string) => void;
 }
@@ -14,15 +14,15 @@ export function Header({ onOpenCart, onOpenAdmin, onOpenPortal, search, setSearc
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
-        <a href="#top" className="flex shrink-0 items-center gap-2 transition-transform duration-300 hover:scale-105">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink font-display text-lg font-bold text-white">
-            L
+        <a href="#top" className="flex shrink-0 items-center gap-2.5 transition-transform duration-300 hover:scale-105">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-neutral-800 to-neutral-950 border border-neutral-800 text-2xl shadow-md">
+            🦍
           </div>
           <div className="hidden sm:block">
-            <p className="font-display text-base font-bold leading-none text-ink">
+            <p className="font-display text-base font-bold leading-none text-ink tracking-wide">
               LKD <span className="text-accent">Imports</span>
             </p>
-            <p className="text-[10px] uppercase tracking-widest text-inkSoft">
+            <p className="text-[10px] uppercase tracking-widest text-inkSoft font-semibold">
               Tabacaria &amp; Vapes
             </p>
           </div>
