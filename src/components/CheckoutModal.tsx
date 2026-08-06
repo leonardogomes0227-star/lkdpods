@@ -1,11 +1,8 @@
 import { useState } from 'react';
 import { X, MapPin, User, CreditCard, MessageCircle } from 'lucide-react';
-import type { CartItem, Order, OrderItem } from '../types';
-import type { Coupon } from '../types'; // se seu Coupon estiver em outro arquivo, ajuste este import
+import { useStore } from '../store';
 import { formatBRL, buildWhatsAppMessage } from '../utils';
-import { calculateDiscount } from '../utils/coupon'; // ajuste o caminho se colocar em outro lugar
-import { trackFunnelEvent } from '../utils/funnelTracker';
-import { saveOrder, upsertCustomer } from '../utils/orderHistory';
+import { trackFunnelEvent } from '../funnelTracker';
 
 export interface CheckoutInfo {
   name: string;
@@ -20,12 +17,9 @@ export interface CheckoutInfo {
 }
 
 interface Props {
-  cart: CartItem[];
   isOpen: boolean;
   onClose: () => void;
-  coupon: Coupon | null;
   deliveryFee: number;
-  onOrderSent: () => void; // ex: limpar carrinho
 }
 
 const emptyInfo: CheckoutInfo = {
@@ -40,72 +34,62 @@ const emptyInfo: CheckoutInfo = {
   troco: '',
 };
 
-export function CheckoutModal({ cart, isOpen, onClose, coupon, deliveryFee, onOrderSent }: Props) {
+export function CheckoutModal({ isOpen, onClose, deliveryFee }: Props) {
+  const cart = useStore((s) => s.cart);
+  const subtotal = useStore((s) => s.subtotal);
+  const discount = useStore((s) => s.discount);
+  const appliedCoupon = useStore((s) => s.appliedCoupon);
+  const recordSale = useStore((s) => s.recordSale);
+  const clearCart = useStore((s) => s.clearCart);
+
   const [info, setInfo] = useState<CheckoutInfo>({ ...emptyInfo, deliveryFee });
+  const [sending, setSending] = useState(false);
 
   if (!isOpen) return null;
 
-  const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const discount = calculateDiscount(coupon, subtotal);
   const total = subtotal - discount + info.deliveryFee;
-
   const isValid = info.name.trim() && info.phone.trim() && info.address.trim() && info.district.trim();
 
   const handleField = (field: keyof CheckoutInfo, value: string) => {
     setInfo((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (!isValid) {
       alert('Preencha nome, telefone, endereço e bairro pra continuar.');
       return;
     }
+    if (sending) return;
+    setSending(true);
 
-    // Monta o pedido pra salvar no histórico (base da Reposição Inteligente)
-    const orderItems: OrderItem[] = cart.map((item) => ({
-      productId: item.product.id,
-      productName: item.product.name,
-      brand: item.product.brand,
-      flavor: item.selectedFlavor,
-      quantity: item.quantity,
-      unitPrice: item.product.price,
-      unitCost: item.product.cost,
-    }));
+    try {
+      // Salva o pedido de verdade: cria order + order_items no Supabase,
+      // baixa o estoque do sabor vendido e atualiza o cadastro do cliente.
+      await recordSale(total, { name: info.name, phone: info.phone });
 
-    const totalCost = orderItems.reduce((sum, i) => sum + i.unitCost * i.quantity, 0);
+      // FUNIL — etapa 3: cliente foi direcionado ao WhatsApp
+      cart.forEach((item) => {
+        trackFunnelEvent('whatsapp', item.product.id, item.product.name, item.quantity);
+      });
 
-    const order: Order = {
-      id: `order_${Date.now()}`,
-      customerPhone: info.phone,
-      customerName: info.name,
-      timestamp: Date.now(),
-      totalAmount: total,
-      totalCost,
-      profit: total - totalCost,
-      items: orderItems,
-    };
+      // FUNIL — etapa 4: consideramos "compra concluída" no momento do envio.
+      // Se preferir só confirmar quando o pagamento cair de fato, mova esta
+      // chamada pra um botão manual no painel admin (ex: "Marcar como pago").
+      cart.forEach((item) => {
+        trackFunnelEvent('purchase', item.product.id, item.product.name, item.quantity);
+      });
 
-    saveOrder(order);
-    upsertCustomer(info.phone, info.name, total);
+      const link = buildWhatsAppMessage(cart, info, appliedCoupon, subtotal, discount, total);
+      window.open(link, '_blank');
 
-    // FUNIL — etapa 3: cliente foi direcionado ao WhatsApp pra fechar o pedido
-    cart.forEach((item) => {
-      trackFunnelEvent('whatsapp', item.product.id, item.product.name, item.quantity);
-    });
-
-    // FUNIL — etapa 4: consideramos "compra concluída" no momento em que o pedido
-    // é montado e enviado ao WhatsApp. Se preferir confirmar só quando o pagamento
-    // for de fato recebido, mova essa chamada pra um botão manual no seu painel
-    // (ex: "Marcar pedido como pago"), passando order.id.
-    cart.forEach((item) => {
-      trackFunnelEvent('purchase', item.product.id, item.product.name, item.quantity);
-    });
-
-    const link = buildWhatsAppMessage(cart, info, coupon, subtotal, discount, total);
-    window.open(link, '_blank');
-
-    onOrderSent();
-    onClose();
+      clearCart();
+      onClose();
+    } catch (err) {
+      console.error('Erro ao finalizar pedido:', err);
+      alert('Deu um erro ao registrar o pedido. Tenta de novo.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -214,7 +198,7 @@ export function CheckoutModal({ cart, isOpen, onClose, coupon, deliveryFee, onOr
             </div>
             {discount > 0 && (
               <div className="flex justify-between text-accent">
-                <span>Cupom ({coupon?.code})</span>
+                <span>Cupom {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span>
                 <span>-{formatBRL(discount)}</span>
               </div>
             )}
@@ -232,11 +216,11 @@ export function CheckoutModal({ cart, isOpen, onClose, coupon, deliveryFee, onOr
         <div className="border-t border-line bg-bg p-4 sm:p-6">
           <button
             onClick={handleFinish}
-            disabled={!isValid}
+            disabled={!isValid || sending}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
           >
             <MessageCircle className="h-4 w-4" />
-            Enviar Pedido pelo WhatsApp
+            {sending ? 'Enviando...' : 'Enviar Pedido pelo WhatsApp'}
           </button>
         </div>
       </div>
