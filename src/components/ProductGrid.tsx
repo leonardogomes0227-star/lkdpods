@@ -19,13 +19,15 @@ interface Props {
 }
 
 export function ProductGrid({ onAdd, query }: Props) {
-  const { products } = useStore();
+  // Blindagem total contra qualquer retorno undefined do Zustand
+  const storeProducts = useStore((state) => state.products);
+  const products = Array.isArray(storeProducts) ? storeProducts : [];
+
   const [cat, setCat] = useState<Category | 'Todos'>('Todos');
   const [sort, setSort] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
 
   const filtered = useMemo(() => {
-    const safe = Array.isArray(products) ? products : [];
-    let list = safe.filter((p) => {
+    let list = products.filter((p) => {
       if (!p) return false;
       const matchesCat = cat === 'Todos' || p.category === cat;
       const q = (query ?? '').trim().toLowerCase();
@@ -36,11 +38,12 @@ export function ProductGrid({ onAdd, query }: Props) {
         (p.flavor ?? '').toLowerCase().includes(q);
       return matchesCat && matchesQuery;
     });
+
     if (sort === 'price-asc') list = [...list].sort((a, b) => a.price - b.price);
     if (sort === 'price-desc') list = [...list].sort((a, b) => b.price - a.price);
     if (sort === 'featured')
       list = [...list].sort(
-        (a, b) => Number(!!b.featured) - Number(!!a.featured) || b.views - a.views,
+        (a, b) => Number(!!b.featured) - Number(!!a.featured) || (b.views || 0) - (a.views || 0),
       );
     return list;
   }, [products, query, cat, sort]);
