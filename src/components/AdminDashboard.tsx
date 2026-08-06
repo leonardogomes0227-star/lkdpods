@@ -1,18 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Boxes,
   Calendar,
+  ChevronDown,
+  ChevronUp,
   DollarSign,
   LogOut,
   Package,
   Pencil,
+  Phone,
   Plus,
   Search,
+  ShoppingBag,
   Star, // <-- Ícone de estrela adicionado
   Tag,
   Trash2,
   TrendingUp,
+  Users,
   Zap,
 } from 'lucide-react';
 import type { Product } from '../types';
@@ -24,12 +29,26 @@ interface Props {
   onExit: () => void;
 }
 
-type Tab = 'produtos' | 'cupons';
+type Tab = 'produtos' | 'cupons' | 'clientes' | 'pedidos';
+
+function formatDate(ts?: number) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatDateTime(ts?: number) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 
 export function AdminDashboard({ onExit }: Props) {
   const {
     products,
     coupons,
+    customers,
+    orders,
+    fetchCustomers,
+    fetchOrders,
     deleteProduct,
     updateProduct, // <-- ADICIONADO AQUI PARA PODER MARCAR O DESTAQUE
     addCoupon,
@@ -53,6 +72,21 @@ export function AdminDashboard({ onExit }: Props) {
   const [couponPct, setCouponPct] = useState('');
   const [couponMsg, setCouponMsg] = useState<{ ok: boolean; message: string } | null>(null);
 
+  // clientes / pedidos
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  // Carrega clientes e pedidos só quando a aba é aberta pela primeira vez
+  useEffect(() => {
+    if (tab === 'clientes' && (!customers || customers.length === 0)) {
+      fetchCustomers();
+    }
+    if (tab === 'pedidos' && (!orders || orders.length === 0)) {
+      fetchOrders();
+    }
+  }, [tab]);
+
   const metrics = useMemo(() => {
     const safeProducts = products ?? [];
     const safeCoupons = coupons ?? [];
@@ -75,6 +109,27 @@ export function AdminDashboard({ onExit }: Props) {
         p.flavor.toLowerCase().includes(q),
     );
   }, [products, search]);
+
+  const filteredCustomers = useMemo(() => {
+    const list = customers ?? [];
+    const q = customerSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q),
+    );
+  }, [customers, customerSearch]);
+
+  const filteredOrders = useMemo(() => {
+    const list = orders ?? [];
+    const q = orderSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (o) =>
+        (o.customerName ?? '').toLowerCase().includes(q) ||
+        (o.customerPhone ?? '').toLowerCase().includes(q) ||
+        o.items.some((i) => i.productName.toLowerCase().includes(q) || i.flavor.toLowerCase().includes(q)),
+    );
+  }, [orders, orderSearch]);
 
   const safeCoupons = coupons ?? [];
 
@@ -213,12 +268,18 @@ export function AdminDashboard({ onExit }: Props) {
         </div>
 
         {/* TABS */}
-        <div className="mt-6 flex gap-2">
+        <div className="mt-6 flex flex-wrap gap-2">
           <TabButton active={tab === 'produtos'} onClick={() => setTab('produtos')}>
             <Package className="h-4 w-4" /> Produtos
           </TabButton>
           <TabButton active={tab === 'cupons'} onClick={() => setTab('cupons')}>
             <Tag className="h-4 w-4" /> Cupons
+          </TabButton>
+          <TabButton active={tab === 'clientes'} onClick={() => setTab('clientes')}>
+            <Users className="h-4 w-4" /> Clientes
+          </TabButton>
+          <TabButton active={tab === 'pedidos'} onClick={() => setTab('pedidos')}>
+            <ShoppingBag className="h-4 w-4" /> Pedidos
           </TabButton>
         </div>
 
@@ -364,7 +425,7 @@ export function AdminDashboard({ onExit }: Props) {
               </div>
             </div>
           </div>
-        ) : (
+        ) : tab === 'cupons' ? (
           <div className="mt-4">
             {/* CUPONS */}
             <div className="mb-4 rounded-2xl border border-line bg-white p-4 shadow-sm">
@@ -429,6 +490,150 @@ export function AdminDashboard({ onExit }: Props) {
                   {safeCoupons.length === 0 && <tr><td colSpan={4} className="py-12 text-center text-inkSoft">Nenhum cupom cadastrado.</td></tr>}
                 </tbody>
               </table>
+            </div>
+          </div>
+        ) : tab === 'clientes' ? (
+          <div className="mt-4">
+            {/* CLIENTES */}
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-inkSoft" />
+                <input
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Buscar por nome ou telefone..."
+                  className="w-full rounded-xl border border-line bg-white py-2.5 pl-10 pr-4 text-sm text-ink placeholder-inkSoft/60 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent"
+                />
+              </div>
+              <p className="text-xs font-semibold text-inkSoft">{filteredCustomers.length} cliente(s)</p>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+              <div className="hidden md:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-line bg-bgAlt text-xs uppercase tracking-wide text-inkSoft">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Cliente</th>
+                      <th className="px-4 py-3 font-semibold">1ª Compra</th>
+                      <th className="px-4 py-3 font-semibold">Última Compra</th>
+                      <th className="px-4 py-3 font-semibold">Compras</th>
+                      <th className="px-4 py-3 text-right font-semibold">Total Gasto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCustomers.map((c) => (
+                      <tr key={c.id} className="border-b border-line transition hover:bg-bgAlt/50">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-ink">{c.name}</p>
+                          <p className="flex items-center gap-1 text-xs text-inkSoft"><Phone className="h-3 w-3" /> {c.phone}</p>
+                        </td>
+                        <td className="px-4 py-3 text-inkSoft">{formatDate(c.firstPurchase)}</td>
+                        <td className="px-4 py-3 text-inkSoft">{formatDate(c.lastPurchase)}</td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-accentSoft px-2 py-0.5 text-xs font-bold text-accent">
+                            {c.purchaseCount}x
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-ink">{formatBRL(c.totalSpent)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredCustomers.length === 0 && <p className="py-12 text-center text-inkSoft">Nenhum cliente encontrado.</p>}
+              </div>
+
+              {/* MOBILE CARDS */}
+              <div className="divide-y divide-line md:hidden">
+                {filteredCustomers.map((c) => (
+                  <div key={c.id} className="p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-ink">{c.name}</p>
+                      <span className="rounded-full bg-accentSoft px-2 py-0.5 text-xs font-bold text-accent">{c.purchaseCount}x</span>
+                    </div>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-inkSoft"><Phone className="h-3 w-3" /> {c.phone}</p>
+                    <div className="mt-2 flex items-center justify-between text-xs text-inkSoft">
+                      <span>1ª: {formatDate(c.firstPurchase)} · Última: {formatDate(c.lastPurchase)}</span>
+                    </div>
+                    <p className="mt-1 text-right text-sm font-bold text-ink">{formatBRL(c.totalSpent)}</p>
+                  </div>
+                ))}
+                {filteredCustomers.length === 0 && <p className="py-12 text-center text-inkSoft">Nenhum cliente encontrado.</p>}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            {/* PEDIDOS (HISTÓRICO DE COMPRAS) */}
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-inkSoft" />
+                <input
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="Buscar por cliente, produto ou sabor..."
+                  className="w-full rounded-xl border border-line bg-white py-2.5 pl-10 pr-4 text-sm text-ink placeholder-inkSoft/60 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent"
+                />
+              </div>
+              <p className="text-xs font-semibold text-inkSoft">{filteredOrders.length} pedido(s)</p>
+            </div>
+
+            <div className="space-y-3">
+              {filteredOrders.map((o) => {
+                const expanded = expandedOrderId === o.id;
+                return (
+                  <div key={o.id} className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+                    <button
+                      onClick={() => setExpandedOrderId(expanded ? null : o.id)}
+                      className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-bgAlt/50"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-ink">{o.customerName || 'Cliente não identificado'}</p>
+                        <p className="text-xs text-inkSoft">
+                          {formatDateTime(o.timestamp)} {o.customerPhone ? `· ${o.customerPhone}` : ''}
+                        </p>
+                        <p className="mt-0.5 text-xs text-inkSoft">
+                          {o.items.length} item(ns) · {o.items.map((i) => `${i.quantity}x ${i.productName} (${i.flavor})`).join(', ')}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-display text-base font-bold text-ink">{formatBRL(o.totalAmount)}</p>
+                          <p className="text-[11px] font-semibold text-emerald-600">lucro {formatBRL(o.profit)}</p>
+                        </div>
+                        {expanded ? <ChevronUp className="h-4 w-4 text-inkSoft" /> : <ChevronDown className="h-4 w-4 text-inkSoft" />}
+                      </div>
+                    </button>
+
+                    {expanded && (
+                      <div className="border-t border-line bg-bgAlt/40 p-4">
+                        <table className="w-full text-left text-xs">
+                          <thead className="text-inkSoft">
+                            <tr>
+                              <th className="py-1 font-semibold">Produto</th>
+                              <th className="py-1 font-semibold">Sabor</th>
+                              <th className="py-1 font-semibold">Qtd</th>
+                              <th className="py-1 text-right font-semibold">Valor unit.</th>
+                              <th className="py-1 text-right font-semibold">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {o.items.map((item, idx) => (
+                              <tr key={idx} className="border-t border-line/60">
+                                <td className="py-1.5 text-ink">{item.brand} {item.productName}</td>
+                                <td className="py-1.5 text-inkSoft">{item.flavor}</td>
+                                <td className="py-1.5 text-inkSoft">{item.quantity}</td>
+                                <td className="py-1.5 text-right text-inkSoft">{formatBRL(item.unitPrice)}</td>
+                                <td className="py-1.5 text-right font-semibold text-ink">{formatBRL(item.unitPrice * item.quantity)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {filteredOrders.length === 0 && <p className="py-12 text-center text-inkSoft">Nenhum pedido encontrado.</p>}
             </div>
           </div>
         )}
