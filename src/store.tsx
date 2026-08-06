@@ -38,9 +38,12 @@ export const useStore = create<StoreState>((set, get) => ({
       const { data, error } = await supabase.from('products').select('*');
       if (!error && data) {
         set({ products: data });
+      } else {
+        set({ products: [] });
       }
     } catch (err) {
       console.error('Erro ao buscar produtos:', err);
+      set({ products: [] });
     }
   },
 
