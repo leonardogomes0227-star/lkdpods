@@ -13,6 +13,7 @@ interface StoreState {
   appliedCoupon: any;
   isAuthed: boolean;
   flashDeadline: number;
+  fetchProducts: () => Promise<void>;
   setProducts: (products: Product[]) => void;
   addToCart: (product: Product, qty?: number, flavor?: string) => boolean;
   recordSale: (amount: number, customerInfo?: { name: string; phone: string }) => Promise<void>;
@@ -31,6 +32,17 @@ export const useStore = create<StoreState>((set, get) => ({
   appliedCoupon: null,
   isAuthed: false,
   flashDeadline: Date.now() + 24 * 60 * 60 * 1000,
+
+  fetchProducts: async () => {
+    try {
+      const { data, error } = await supabase.from('products').select('*');
+      if (!error && data) {
+        set({ products: data });
+      }
+    } catch (err) {
+      console.error('Erro ao buscar produtos:', err);
+    }
+  },
 
   setProducts: (products) => set({ products: products || [] }),
   setAuthed: (authed) => set({ isAuthed: authed }),
