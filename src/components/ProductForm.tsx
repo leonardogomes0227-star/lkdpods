@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Camera, Image as ImageIcon } from 'lucide-react';
-import type { Product, Category } from '../types';
+import { X, Save, Camera, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
+import type { Product, Category, FlavorStock } from '../types';
 import { useStore } from '../store';
 
 interface Props {
@@ -20,15 +20,14 @@ const GRADIENTS = [
 
 export function ProductForm({ open, onClose, editing }: Props) {
   const { addProduct, updateProduct } = useStore();
-  
+
   const [brand, setBrand] = useState('');
   const [name, setName] = useState('');
-  const [flavor, setFlavor] = useState('');
+  const [flavors, setFlavors] = useState<FlavorStock[]>([{ name: '', stock: 0 }]);
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category>('Pods Descartáveis');
   const [price, setPrice] = useState('');
   const [cost, setCost] = useState('');
-  const [stock, setStock] = useState('');
   const [emoji, setEmoji] = useState('💨');
   const [gradient, setGradient] = useState(GRADIENTS[0]);
   const [image, setImage] = useState<string>(''); // Estado da Foto
@@ -37,24 +36,26 @@ export function ProductForm({ open, onClose, editing }: Props) {
     if (editing) {
       setBrand(editing.brand);
       setName(editing.name);
-      setFlavor(editing.flavor);
+      setFlavors(
+        Array.isArray(editing.flavors) && editing.flavors.length > 0
+          ? editing.flavors
+          : [{ name: '', stock: 0 }]
+      );
       setDescription(editing.description || '');
       setCategory(editing.category);
       setPrice(String(editing.price));
       setCost(String(editing.cost));
-      setStock(String(editing.stock));
       setEmoji(editing.emoji);
       setGradient(editing.gradient);
       setImage(editing.image || '');
     } else {
       setBrand('');
       setName('');
-      setFlavor('');
+      setFlavors([{ name: '', stock: 0 }]);
       setDescription('');
       setCategory('Pods Descartáveis');
       setPrice('');
       setCost('');
-      setStock('');
       setEmoji('💨');
       setGradient(GRADIENTS[0]);
       setImage('');
@@ -90,18 +91,48 @@ export function ProductForm({ open, onClose, editing }: Props) {
     reader.readAsDataURL(file);
   };
 
+  const handleFlavorNameChange = (index: number, value: string) => {
+    setFlavors((prev) => prev.map((f, i) => (i === index ? { ...f, name: value } : f)));
+  };
+
+  const handleFlavorStockChange = (index: number, value: string) => {
+    const parsed = parseInt(value, 10);
+    setFlavors((prev) =>
+      prev.map((f, i) => (i === index ? { ...f, stock: Number.isNaN(parsed) ? 0 : parsed } : f))
+    );
+  };
+
+  const handleAddFlavorRow = () => {
+    setFlavors((prev) => [...prev, { name: '', stock: 0 }]);
+  };
+
+  const handleRemoveFlavorRow = (index: number) => {
+    setFlavors((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+  };
+
+  const totalStock = flavors.reduce((sum, f) => sum + (Number.isFinite(f.stock) ? f.stock : 0), 0);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const cleanFlavors = flavors
+      .map((f) => ({ name: f.name.trim(), stock: Math.max(0, f.stock || 0) }))
+      .filter((f) => f.name.length > 0);
+
+    if (cleanFlavors.length === 0) {
+      alert('Cadastre pelo menos um sabor com nome.');
+      return;
+    }
+
     const productData = {
       brand,
       name,
-      flavor,
+      flavors: cleanFlavors,
+      stock: cleanFlavors.reduce((sum, f) => sum + f.stock, 0),
       description,
       category,
       price: parseFloat(price.replace(',', '.')),
       cost: parseFloat(cost.replace(',', '.')),
-      stock: parseInt(stock, 10),
       emoji,
       gradient,
       image, // Salva a foto real!
@@ -112,7 +143,7 @@ export function ProductForm({ open, onClose, editing }: Props) {
     } else {
       addProduct(productData);
     }
-    
+
     onClose();
   };
 
@@ -132,7 +163,7 @@ export function ProductForm({ open, onClose, editing }: Props) {
 
         <div className="flex-1 overflow-y-auto px-6 py-6 bg-white">
           <form id="product-form" onSubmit={handleSubmit} className="space-y-6">
-            
+
             {/* CÂMERA DO CELULAR */}
             <div>
               <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-inkSoft">Foto do Produto</label>
@@ -150,7 +181,7 @@ export function ProductForm({ open, onClose, editing }: Props) {
                     <p className="text-sm font-medium text-inkSoft">Nenhuma foto selecionada</p>
                   </div>
                 )}
-                
+
                 <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-ink/90 active:scale-95">
                   <Camera className="h-4 w-4" />
                   {image ? 'Trocar Foto' : 'Tirar Foto / Galeria'}
@@ -171,9 +202,51 @@ export function ProductForm({ open, onClose, editing }: Props) {
               </div>
             </div>
 
+            {/* SABORES COM ESTOQUE INDIVIDUAL */}
             <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-inkSoft">Sabores Disponíveis (Separe por vírgula)</label>
-              <input required value={flavor} onChange={(e) => setFlavor(e.target.value)} placeholder="Ex: Mango Ice, Mint, Watermelon" className="w-full rounded-xl border border-line bg-bg py-2.5 px-4 text-sm text-ink outline-none focus:border-accent" />
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-xs font-bold uppercase tracking-wide text-inkSoft">Sabores e Estoque</label>
+                <span className="text-xs font-semibold text-inkSoft">Total: {totalStock} un.</span>
+              </div>
+
+              <div className="space-y-2">
+                {flavors.map((f, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input
+                      required
+                      value={f.name}
+                      onChange={(e) => handleFlavorNameChange(index, e.target.value)}
+                      placeholder="Ex: Mango Ice"
+                      className="flex-1 rounded-xl border border-line bg-bg py-2.5 px-4 text-sm text-ink outline-none focus:border-accent"
+                    />
+                    <input
+                      required
+                      type="number"
+                      min={0}
+                      value={f.stock}
+                      onChange={(e) => handleFlavorStockChange(index, e.target.value)}
+                      placeholder="Qtd."
+                      className="w-24 rounded-xl border border-line bg-bg py-2.5 px-4 text-sm text-ink outline-none focus:border-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFlavorRow(index)}
+                      disabled={flavors.length <= 1}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line text-inkSoft transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddFlavorRow}
+                className="mt-2 flex items-center gap-1.5 rounded-xl border border-dashed border-line px-4 py-2 text-xs font-bold text-inkSoft transition hover:border-accent hover:text-accent"
+              >
+                <Plus className="h-3.5 w-3.5" /> Adicionar Sabor
+              </button>
             </div>
 
             <div>
@@ -201,15 +274,9 @@ export function ProductForm({ open, onClose, editing }: Props) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-inkSoft">Estoque Total</label>
-                <input required type="number" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="0" className="w-full rounded-xl border border-line bg-bg py-2.5 px-4 text-sm text-ink outline-none focus:border-accent" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-inkSoft">Emoji (Opcional se tiver foto)</label>
-                <input value={emoji} onChange={(e) => setEmoji(e.target.value)} className="w-full rounded-xl border border-line bg-bg py-2.5 px-4 text-center text-xl outline-none focus:border-accent" />
-              </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-inkSoft">Emoji (Opcional se tiver foto)</label>
+              <input value={emoji} onChange={(e) => setEmoji(e.target.value)} className="w-32 rounded-xl border border-line bg-bg py-2.5 px-4 text-center text-xl outline-none focus:border-accent" />
             </div>
 
             <div>
