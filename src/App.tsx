@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, Flame, Instagram, MessageCircle, Truck } from 'lucide-react';
 import { useStore } from './store';
 import { AnimatedBackground } from './components/AnimatedBackground';
@@ -103,7 +103,7 @@ function Footer() {
 }
 
 export default function App() {
-  const { flashDeadline, isAuthed, addToCart } = useStore();
+  const { flashDeadline, isAuthed, addToCart, fetchProducts } = useStore();
   
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -114,6 +114,10 @@ export default function App() {
   
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productModalOpen, setProductModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleProductClick = (p: Product) => {
     setSelectedProduct(p);
