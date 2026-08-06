@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, ShoppingBag, FileText, Droplets, Minus, Plus } from 'lucide-react';
 import type { Product } from '../types';
 import { formatBRL } from '../utils';
+import { trackFunnelEvent } from '../utils/funnelTracker';
 
 interface Props {
   product: Product | null;
@@ -42,6 +43,14 @@ export function ProductModal({ product, isOpen, onClose, onAddToCart }: Props) {
     };
   }, [isOpen]);
 
+  // FUNIL — etapa 1: registra "visualização" toda vez que o modal abre com um produto
+  useEffect(() => {
+    if (isOpen && product) {
+      trackFunnelEvent('view', product.id, product.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, product]);
+
   if (!isOpen || !product) return null;
 
   const handleAdd = () => {
@@ -53,6 +62,10 @@ export function ProductModal({ product, isOpen, onClose, onAddToCart }: Props) {
       alert(`Só temos ${selectedFlavorStock} unidade(s) desse sabor em estoque.`);
       return;
     }
+
+    // FUNIL — etapa 2: registra "clique em comprar" (adicionou à sacola)
+    trackFunnelEvent('click_buy', product.id, product.name, quantity);
+
     onAddToCart(product, selectedFlavor, quantity);
     onClose();
   };
