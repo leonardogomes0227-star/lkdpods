@@ -17,12 +17,11 @@ const PAYMENTS: { key: PaymentMethod; label: string; icon: typeof Landmark }[] =
 ];
 
 export function CheckoutModal({ open, onClose, onDone }: Props) {
-  // AQUI ADICIONAMOS O recordSale PARA SALVAR O DINHEIRO DA VENDA
   const { cart, subtotal, discount, total, appliedCoupon, clearCart, recordSale } = useStore();
   
   const [info, setInfo] = useState<CheckoutInfo>({
     name: '',
-    phone: '', // CAMPO DE TELEFONE ADICIONADO AQUI
+    phone: '',
     address: '',
     number: '',
     district: '',
@@ -42,7 +41,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
   const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (!info.name.trim()) e.name = 'Informe seu nome.';
-    if (!info.phone.trim()) e.phone = 'Informe seu telefone/WhatsApp.'; // VALIDAÇÃO DO TELEFONE
+    if (!info.phone.trim()) e.phone = 'Informe seu telefone/WhatsApp.';
     if (!info.address.trim()) e.address = 'Informe a rua.';
     if (!info.number.trim()) e.number = 'Informe o número.';
     if (!info.district.trim()) e.district = 'Informe o bairro.';
@@ -53,8 +52,9 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
+    
     const url = buildWhatsAppMessage(
       cart,
       info,
@@ -64,8 +64,8 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
       finalTotal, 
     );
     
-    // AVISA O SISTEMA QUE A VENDA ACONTECEU PARA SOMAR NO FECHAMENTO!
-    recordSale(finalTotal);
+    // REGISTRA A VENDA, ABATE O ESTOQUE POR SABOR E CADASTRA O CLIENTE NA NUVEM
+    await recordSale(finalTotal, { name: info.name, phone: info.phone });
     
     window.open(url, '_blank');
     setSent(true);
@@ -76,7 +76,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
       clearCart();
       setInfo({
         name: '',
-        phone: '', // LIMPA O TELEFONE DEPOIS DA COMPRA
+        phone: '',
         address: '',
         number: '',
         district: '',
@@ -143,7 +143,6 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               />
             </Field>
 
-            {/* NOVO CAMPO DO TELEFONE PARA O ENTREGADOR LIGAR */}
             <Field label="WhatsApp / Celular" icon={<Phone className="h-3.5 w-3.5" />} error={errors.phone}>
               <input
                 type="tel"
@@ -200,6 +199,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
+                  type="button"
                   onClick={() => setInfo({ ...info, deliveryFee: 8 })}
                   className={`flex flex-col items-start justify-center rounded-xl border px-3 py-3 transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
                     info.deliveryFee === 8
@@ -211,6 +211,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
                   <span className="text-[11px] font-semibold text-accent">+ R$ 8,00</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setInfo({ ...info, deliveryFee: 15 })}
                   className={`flex flex-col items-start justify-center rounded-xl border px-3 py-3 transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
                     info.deliveryFee === 15
@@ -235,6 +236,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
                   return (
                     <button
                       key={p.key}
+                      type="button"
                       onClick={() => setInfo({ ...info, payment: p.key })}
                       className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-sm font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
                         active
@@ -307,6 +309,7 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
             </div>
 
             <button
+              type="button"
               onClick={handleSubmit}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-4 text-base font-bold text-white transition-all duration-300 hover:scale-[1.02] hover:bg-ink/90 active:scale-95 shadow-xl shadow-ink/10"
             >
@@ -326,7 +329,7 @@ function inputCls(error?: string): string {
   }`;
 }
 
-function Field({
+Field({
   label,
   icon,
   error,
