@@ -137,11 +137,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addProduct = useCallback((p: Omit<Product, 'id' | 'views'>) => {
     supabase
       .from('products')
-      .insert([{ ...p, views: Math.floor(Math.random() * 8) + 1 }])
+      .insert([{ ...p, views: Math.floor(Math.random() * 8) + 1, featured: false }])
       .select()
-      .single()
-      .then(({ data }) => {
-        if (data) setProducts((prev) => [data, ...prev]);
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Erro detalhado do Supabase ao cadastrar:', error);
+          alert('Erro ao salvar no banco: ' + error.message);
+        } else if (data && data.length > 0) {
+          setProducts((prev) => [data[0], ...prev]);
+        }
       });
   }, []);
 
