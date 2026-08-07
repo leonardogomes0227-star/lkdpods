@@ -68,8 +68,14 @@ function computeTotals(sales: Sale[]) {
 function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: string, qty: number): FlavorStock[] {
   const list = Array.isArray(flavors) ? flavors : [];
   const now = Date.now();
+  
+  // Garantir que o nome do sabor combine perfeitamente, ignorando espaços e maiúsculas/minúsculas
+  const safeFlavorName = flavorName.trim().toLowerCase();
+  
   return list.map((f) =>
-    f.name === flavorName ? { ...f, stock: Math.max(0, f.stock - qty), lastSoldAt: now } : f
+    f.name.trim().toLowerCase() === safeFlavorName
+      ? { ...f, stock: Math.max(0, f.stock - qty), lastSoldAt: now }
+      : f
   );
 }
 
@@ -196,28 +202,43 @@ export const useStore = create<StoreState>((set, get) => ({
       alert('Por favor, selecione um sabor.');
       return false;
     }
-    const flavorEntry = (Array.isArray(product.flavors) ? product.flavors : []).find((f) => f.name === flavor);
+    const flavorEntry = (Array.isArray(product.flavors) ? product.flavors : []).find(
+      (f) => f.name.trim().toLowerCase() === flavor.trim().toLowerCase()
+    );
+    
     if (flavorEntry && flavorEntry.stock <= 0) {
       alert('Esse sabor está esgotado.');
       return false;
     }
+    
     let success = false;
+    
     set((state) => {
       const prev = Array.isArray(state.cart) ? state.cart : [];
-      const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
+      const existing = prev.find(
+        (c) => c.product.id === product.id && c.selectedFlavor === flavor
+      );
       const currentQtyInCart = existing ? existing.quantity : 0;
       const requestedTotal = currentQtyInCart + qty;
+      
       if (flavorEntry && requestedTotal > flavorEntry.stock) {
         alert(`Só temos ${flavorEntry.stock} unidade(s) desse sabor em estoque.`);
         success = false;
         return state;
       }
+      
       success = true;
       const newCart = existing
-        ? prev.map((c) => (c.product.id === product.id && c.selectedFlavor === flavor ? { ...c, quantity: requestedTotal } : c))
+        ? prev.map((c) =>
+            c.product.id === product.id && c.selectedFlavor === flavor
+              ? { ...c, quantity: requestedTotal }
+              : c
+          )
         : [...prev, { product, quantity: qty, selectedFlavor: flavor }];
+        
       const newCount = newCart.reduce((sum, item) => sum + item.quantity, 0);
       const newSubtotal = newCart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      
       return {
         cart: newCart,
         cartCount: newCount,
@@ -225,6 +246,7 @@ export const useStore = create<StoreState>((set, get) => ({
         total: newSubtotal - (state.discount || 0),
       };
     });
+    
     return success;
   },
 
@@ -235,11 +257,21 @@ export const useStore = create<StoreState>((set, get) => ({
     const totalCost = cartItems.reduce((sum, item) => sum + item.product.cost * item.quantity, 0);
     const profit = amount - totalCost;
     const tempSaleId = Math.random().toString();
+
+    // 1. Atualizar Vendas Locais Imediatamente (Deixa o app rápido)
     set((prev) => {
       const newSales = [...(prev.sales || []), { id: tempSaleId, amount, timestamp }];
       return { sales: newSales, ...computeTotals(newSales) };
     });
-    await supabase.from('sales').insert([{ amount, timestamp }]);
+
+    // 2. Salvar Venda no Banco de Dados
+    try {
+      await supabase.from('sales').insert([{ amount, timestamp }]);
+    } catch (e) {
+      console.error('Erro ao salvar venda:', e);
+    }
+
+    // 3. Criar Pedido no Banco de Dados
     let orderId: string | null = null;
     try {
       const { data: orderData, error: orderError } = await supabase
@@ -258,41 +290,61 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (err) {
       console.error('Erro ao criar pedido:', err);
     }
+
+    // 4. Abater Estoque (Local e Banco) e Salvar Itens do Pedido
     for (const item of cartItems) {
       const product = item.product;
       const updatedFlavors = decrementFlavorStock(product.flavors, item.selectedFlavor, item.quantity);
       const newTotalStock = updatedFlavors.reduce((sum, f) => sum + f.stock, 0);
+
+      // Atualiza o estoque na tela instantaneamente
       set((prev) => ({
         products: (Array.isArray(prev.products) ? prev.products : []).map((p) =>
           p.id === product.id ? { ...p, flavors: updatedFlavors, stock: newTotalStock } : p
         ),
       }));
-      await supabase
-        .from('products')
-        .update({ flavors: updatedFlavors, stock: newTotalStock })
-        .eq('id', product.id);
+
+      // Salva o novo estoque abatido no Supabase com proteção de erro
+      try {
+        await supabase
+          .from('products')
+          .update({ flavors: updatedFlavors, stock: newTotalStock })
+          .eq('id', product.id);
+      } catch (e) {
+        console.error('Erro ao atualizar estoque no banco:', e);
+      }
+
+      // Salva o item dentro do Pedido
       if (orderId) {
-        await supabase.from('order_items').insert([{
-          order_id: orderId,
-          product_id: product.id,
-          product_name: product.name,
-          brand: product.brand,
-          flavor: item.selectedFlavor,
-          quantity: item.quantity,
-          unit_price: product.price,
-          unit_cost: product.cost,
-        }]);
+        try {
+          await supabase.from('order_items').insert([{
+            order_id: orderId,
+            product_id: product.id,
+            product_name: product.name,
+            brand: product.brand,
+            flavor: item.selectedFlavor,
+            quantity: item.quantity,
+            unit_price: product.price,
+            unit_cost: product.cost,
+          }]);
+        } catch (e) {
+          console.error('Erro ao salvar item do pedido:', e);
+        }
       }
     }
+
+    // 5. Atualizar Dados do Cliente (Fidelidade)
     if (customerInfo && customerInfo.phone) {
       const phone = customerInfo.phone.trim();
       const name = customerInfo.name.trim();
+      
       try {
         const { data: existing } = await supabase
           .from('customers')
           .select('*')
           .eq('phone', phone)
           .maybeSingle();
+
         if (existing) {
           await supabase
             .from('customers')
@@ -316,6 +368,8 @@ export const useStore = create<StoreState>((set, get) => ({
       } catch (err) {
         console.error('Erro ao atualizar cliente:', err);
       }
+
+      // Atualiza Cliente Localmente
       set((prev) => {
         const customers = Array.isArray(prev.customers) ? prev.customers : [];
         const idx = customers.findIndex((c) => c.phone === phone);
@@ -338,6 +392,8 @@ export const useStore = create<StoreState>((set, get) => ({
         };
       });
     }
+
+    // 6. Atualizar Pedidos Localmente
     if (orderId) {
       set((prev) => ({
         orders: [
@@ -350,6 +406,7 @@ export const useStore = create<StoreState>((set, get) => ({
             totalCost,
             profit,
             items: cartItems.map((item) => ({
+              id: Math.random().toString(),
               productId: item.product.id,
               productName: item.product.name,
               brand: item.product.brand,
