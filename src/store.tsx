@@ -69,7 +69,6 @@ function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: st
   const list = Array.isArray(flavors) ? flavors : [];
   const now = Date.now();
   
-  // Garantir que o nome do sabor combine perfeitamente, ignorando espaços e maiúsculas/minúsculas
   const safeFlavorName = flavorName.trim().toLowerCase();
   
   return list.map((f) =>
@@ -178,7 +177,7 @@ export const useStore = create<StoreState>((set, get) => ({
   fetchOrders: async () => {
     try {
       const { data, error } = await supabase
-        .from('orders')
+        .from('customer_orders')
         .select('*, order_items(*)')
         .order('timestamp', { ascending: false });
       if (!error && Array.isArray(data)) {
@@ -258,24 +257,21 @@ export const useStore = create<StoreState>((set, get) => ({
     const profit = amount - totalCost;
     const tempSaleId = Math.random().toString();
 
-    // 1. Atualizar Vendas Locais Imediatamente (Deixa o app rápido)
     set((prev) => {
       const newSales = [...(prev.sales || []), { id: tempSaleId, amount, timestamp }];
       return { sales: newSales, ...computeTotals(newSales) };
     });
 
-    // 2. Salvar Venda no Banco de Dados
     try {
       await supabase.from('sales').insert([{ amount, timestamp }]);
     } catch (e) {
       console.error('Erro ao salvar venda:', e);
     }
 
-    // 3. Criar Pedido no Banco de Dados
     let orderId: string | null = null;
     try {
       const { data: orderData, error: orderError } = await supabase
-        .from('orders')
+        .from('customer_orders')
         .insert([{
           customer_phone: customerInfo?.phone?.trim() || null,
           customer_name: customerInfo?.name?.trim() || null,
@@ -291,20 +287,17 @@ export const useStore = create<StoreState>((set, get) => ({
       console.error('Erro ao criar pedido:', err);
     }
 
-    // 4. Abater Estoque (Local e Banco) e Salvar Itens do Pedido
     for (const item of cartItems) {
       const product = item.product;
       const updatedFlavors = decrementFlavorStock(product.flavors, item.selectedFlavor, item.quantity);
       const newTotalStock = updatedFlavors.reduce((sum, f) => sum + f.stock, 0);
 
-      // Atualiza o estoque na tela instantaneamente
       set((prev) => ({
         products: (Array.isArray(prev.products) ? prev.products : []).map((p) =>
           p.id === product.id ? { ...p, flavors: updatedFlavors, stock: newTotalStock } : p
         ),
       }));
 
-      // Salva o novo estoque abatido no Supabase com proteção de erro
       try {
         await supabase
           .from('products')
@@ -314,7 +307,6 @@ export const useStore = create<StoreState>((set, get) => ({
         console.error('Erro ao atualizar estoque no banco:', e);
       }
 
-      // Salva o item dentro do Pedido
       if (orderId) {
         try {
           await supabase.from('order_items').insert([{
@@ -333,7 +325,6 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     }
 
-    // 5. Atualizar Dados do Cliente (Fidelidade)
     if (customerInfo && customerInfo.phone) {
       const phone = customerInfo.phone.trim();
       const name = customerInfo.name.trim();
@@ -369,7 +360,6 @@ export const useStore = create<StoreState>((set, get) => ({
         console.error('Erro ao atualizar cliente:', err);
       }
 
-      // Atualiza Cliente Localmente
       set((prev) => {
         const customers = Array.isArray(prev.customers) ? prev.customers : [];
         const idx = customers.findIndex((c) => c.phone === phone);
@@ -393,7 +383,6 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     }
 
-    // 6. Atualizar Pedidos Localmente
     if (orderId) {
       set((prev) => ({
         orders: [
