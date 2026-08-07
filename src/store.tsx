@@ -68,7 +68,6 @@ function computeTotals(sales: Sale[]) {
 function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: string, qty: number): FlavorStock[] {
   const list = Array.isArray(flavors) ? flavors : [];
   const now = Date.now();
-  
   const safeFlavorName = flavorName.trim().toLowerCase();
   
   return list.map((f) =>
