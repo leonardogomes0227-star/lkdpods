@@ -28,6 +28,7 @@ export function buildWhatsAppMessage(
   
   text += `\n*🚚 DADOS DE ENTREGA:*\n`;
   text += `👤 Nome: ${info.name}\n`;
+  text += `📱 WhatsApp: ${info.phone}\n`;
   text += `📍 Endereço: ${info.address}, Nº ${info.number}\n`;
   text += `🏘️ Bairro: ${info.district}\n`;
   if (info.reference) text += `📌 Ref: ${info.reference}\n`;
