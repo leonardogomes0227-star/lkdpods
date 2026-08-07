@@ -45,7 +45,6 @@ interface StoreState {
   resetFlash: () => void;
 }
 
-// Calcula os totais de faturamento (dia / semana / mês) a partir da lista de vendas
 function computeTotals(sales: Sale[]) {
   const now = Date.now();
   const oneDay = 24 * 60 * 60 * 1000;
@@ -66,7 +65,6 @@ function computeTotals(sales: Sale[]) {
   return { dailyTotal: daily, weeklyTotal: weekly, monthlyTotal: monthly };
 }
 
-// Reduz o estoque de um sabor específico e marca a data da última venda (Controle Inteligente de Estoque)
 function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: string, qty: number): FlavorStock[] {
   const list = Array.isArray(flavors) ? flavors : [];
   const now = Date.now();
@@ -154,7 +152,6 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  // Cadastro Inteligente de Clientes
   fetchCustomers: async () => {
     try {
       const { data, error } = await supabase
@@ -172,7 +169,6 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  // Histórico de Compras (pedidos + itens, mais recentes primeiro)
   fetchOrders: async () => {
     try {
       const { data, error } = await supabase
@@ -200,32 +196,26 @@ export const useStore = create<StoreState>((set, get) => ({
       alert('Por favor, selecione um sabor.');
       return false;
     }
-
-    // Confere se o sabor escolhido tem estoque suficiente
     const flavorEntry = (Array.isArray(product.flavors) ? product.flavors : []).find((f) => f.name === flavor);
     if (flavorEntry && flavorEntry.stock <= 0) {
       alert('Esse sabor está esgotado.');
       return false;
     }
-
     let success = false;
     set((state) => {
       const prev = Array.isArray(state.cart) ? state.cart : [];
       const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
       const currentQtyInCart = existing ? existing.quantity : 0;
       const requestedTotal = currentQtyInCart + qty;
-
       if (flavorEntry && requestedTotal > flavorEntry.stock) {
         alert(`Só temos ${flavorEntry.stock} unidade(s) desse sabor em estoque.`);
         success = false;
         return state;
       }
-
       success = true;
       const newCart = existing
         ? prev.map((c) => (c.product.id === product.id && c.selectedFlavor === flavor ? { ...c, quantity: requestedTotal } : c))
         : [...prev, { product, quantity: qty, selectedFlavor: flavor }];
-
       const newCount = newCart.reduce((sum, item) => sum + item.quantity, 0);
       const newSubtotal = newCart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
       return {
@@ -238,26 +228,18 @@ export const useStore = create<StoreState>((set, get) => ({
     return success;
   },
 
-  // ===== FLUXO AUTOMÁTICO DE VENDA =====
-  // Ao fechar a venda: cria o pedido, salva cada item vendido (produto+sabor+qtd+valor),
-  // baixa o estoque só do sabor certo, calcula lucro e atualiza o histórico do cliente — tudo de uma vez.
   recordSale: async (amount, customerInfo) => {
     const timestamp = Date.now();
     const state = get();
     const cartItems = Array.isArray(state.cart) ? state.cart : [];
-
     const totalCost = cartItems.reduce((sum, item) => sum + item.product.cost * item.quantity, 0);
     const profit = amount - totalCost;
-
-    // Mantém a lista "sales" antiga funcionando (compatibilidade com o dashboard atual)
     const tempSaleId = Math.random().toString();
     set((prev) => {
       const newSales = [...(prev.sales || []), { id: tempSaleId, amount, timestamp }];
       return { sales: newSales, ...computeTotals(newSales) };
     });
     await supabase.from('sales').insert([{ amount, timestamp }]);
-
-    // 1) Cria o pedido (cabeçalho da venda)
     let orderId: string | null = null;
     try {
       const { data: orderData, error: orderError } = await supabase
@@ -276,24 +258,19 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (err) {
       console.error('Erro ao criar pedido:', err);
     }
-
-    // 2) Baixa o estoque do sabor vendido + grava cada item do pedido
     for (const item of cartItems) {
       const product = item.product;
       const updatedFlavors = decrementFlavorStock(product.flavors, item.selectedFlavor, item.quantity);
       const newTotalStock = updatedFlavors.reduce((sum, f) => sum + f.stock, 0);
-
       set((prev) => ({
         products: (Array.isArray(prev.products) ? prev.products : []).map((p) =>
           p.id === product.id ? { ...p, flavors: updatedFlavors, stock: newTotalStock } : p
         ),
       }));
-
       await supabase
         .from('products')
         .update({ flavors: updatedFlavors, stock: newTotalStock })
         .eq('id', product.id);
-
       if (orderId) {
         await supabase.from('order_items').insert([{
           order_id: orderId,
@@ -307,19 +284,15 @@ export const useStore = create<StoreState>((set, get) => ({
         }]);
       }
     }
-
-    // 3) Cria ou atualiza o cadastro do cliente (nome, telefone, 1ª/última compra, qtd, total gasto)
     if (customerInfo && customerInfo.phone) {
       const phone = customerInfo.phone.trim();
       const name = customerInfo.name.trim();
-
       try {
         const { data: existing } = await supabase
           .from('customers')
           .select('*')
           .eq('phone', phone)
           .maybeSingle();
-
         if (existing) {
           await supabase
             .from('customers')
@@ -343,8 +316,6 @@ export const useStore = create<StoreState>((set, get) => ({
       } catch (err) {
         console.error('Erro ao atualizar cliente:', err);
       }
-
-      // Atualiza a lista local (se a tela de clientes já estiver carregada)
       set((prev) => {
         const customers = Array.isArray(prev.customers) ? prev.customers : [];
         const idx = customers.findIndex((c) => c.phone === phone);
@@ -367,8 +338,6 @@ export const useStore = create<StoreState>((set, get) => ({
         };
       });
     }
-
-    // 4) Atualiza a lista local de pedidos (histórico de compras)
     if (orderId) {
       set((prev) => ({
         orders: [
@@ -397,22 +366,26 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   addProduct: async (product) => {
-    const tempId = Math.random().toString(36).slice(2);
-    const newProduct = { ...product, id: tempId } as Product;
-
-    // Mostra na tela na hora, mesmo antes do Supabase confirmar
-    set((prev) => ({ products: [...(Array.isArray(prev.products) ? prev.products : []), newProduct] }));
-
     try {
-      const { data, error } = await supabase.from('products').insert([product]).select().single();
-      if (!error && data) {
-        // Troca o produto temporário pelo salvo de verdade (com o id real do banco)
+      const { data, error } = await supabase
+        .from('products')
+        .insert([product])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao salvar produto no Supabase:', error);
+        alert('Erro ao salvar no banco: ' + error.message);
+        return;
+      }
+
+      if (data) {
         set((prev) => ({
-          products: (Array.isArray(prev.products) ? prev.products : []).map((p) => (p.id === tempId ? data : p)),
+          products: [...(Array.isArray(prev.products) ? prev.products : []), data],
         }));
       }
     } catch (err) {
-      console.error('Erro ao cadastrar produto:', err);
+      console.error('Erro inesperado ao cadastrar produto:', err);
     }
   },
 
@@ -442,16 +415,10 @@ export const useStore = create<StoreState>((set, get) => ({
 
   addCoupon: (code, discountPercent) => {
     const cleanCode = code.trim().toUpperCase();
-    if (!cleanCode) {
-      return { ok: false, message: 'Digite um código válido.' };
-    }
-    if (!discountPercent || discountPercent <= 0 || discountPercent > 100) {
-      return { ok: false, message: 'Informe um desconto entre 1 e 100.' };
-    }
+    if (!cleanCode) return { ok: false, message: 'Digite um código válido.' };
+    if (!discountPercent || discountPercent <= 0 || discountPercent > 100) return { ok: false, message: 'Informe um desconto entre 1 e 100.' };
     const exists = get().coupons.some((c) => c.code === cleanCode);
-    if (exists) {
-      return { ok: false, message: 'Já existe um cupom com esse código.' };
-    }
+    if (exists) return { ok: false, message: 'Já existe um cupom com esse código.' };
     const newCoupon: Coupon = {
       id: Math.random().toString(36).slice(2),
       code: cleanCode,
