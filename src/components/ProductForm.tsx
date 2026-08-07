@@ -10,7 +10,7 @@ interface Props {
 }
 
 const GRADIENTS = [
-  'from-zinc-100 to-zinc-200', // Cores mais neutras caso use foto sem fundo
+  'from-zinc-100 to-zinc-200',
   'from-orange-400 to-red-500',
   'from-emerald-400 to-emerald-600',
   'from-blue-400 to-indigo-500',
@@ -30,7 +30,7 @@ export function ProductForm({ open, onClose, editing }: Props) {
   const [cost, setCost] = useState('');
   const [emoji, setEmoji] = useState('💨');
   const [gradient, setGradient] = useState(GRADIENTS[0]);
-  const [image, setImage] = useState<string>(''); // Estado da Foto
+  const [image, setImage] = useState<string>('');
 
   useEffect(() => {
     if (editing) {
@@ -64,7 +64,6 @@ export function ProductForm({ open, onClose, editing }: Props) {
 
   if (!open) return null;
 
-  // SISTEMA DE COMPRESSÃO DE IMAGEM PARA NÃO TRAVAR O CELULAR
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -74,7 +73,7 @@ export function ProductForm({ open, onClose, editing }: Props) {
       const img = new window.Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 500; // Reduz a foto para um tamanho leve
+        const MAX_WIDTH = 500;
         const scaleSize = MAX_WIDTH / img.width;
         canvas.width = MAX_WIDTH;
         canvas.height = img.height * scaleSize;
@@ -82,7 +81,7 @@ export function ProductForm({ open, onClose, editing }: Props) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.6); // 60% de qualidade
+          const compressed = canvas.toDataURL('image/jpeg', 0.6);
           setImage(compressed);
         }
       };
@@ -112,7 +111,8 @@ export function ProductForm({ open, onClose, editing }: Props) {
 
   const totalStock = flavors.reduce((sum, f) => sum + (Number.isFinite(f.stock) ? f.stock : 0), 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Deixamos a função assíncrona para garantir que só feche depois de salvar!
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanFlavors = flavors
@@ -135,16 +135,19 @@ export function ProductForm({ open, onClose, editing }: Props) {
       cost: parseFloat(cost.replace(',', '.')),
       emoji,
       gradient,
-      image, // Salva a foto real!
+      image,
     };
 
-    if (editing) {
-      updateProduct(editing.id, productData);
-    } else {
-      addProduct(productData);
+    try {
+      if (editing) {
+        await updateProduct(editing.id, productData);
+      } else {
+        await addProduct(productData);
+      }
+      onClose();
+    } catch (error) {
+      console.error(error);
     }
-
-    onClose();
   };
 
   return (
@@ -152,7 +155,7 @@ export function ProductForm({ open, onClose, editing }: Props) {
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
       <div className="relative w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-slide-up">
-        <div className="flex items-center justify-between border-b border-line px-6 py-4 bg-white">
+        <div className="flex items-center justify-between border-b border-line px-6 py-4 bg-white shrink-0">
           <h2 className="font-display text-lg font-bold text-ink">
             {editing ? 'Editar Produto' : 'Novo Produto'}
           </h2>
@@ -161,9 +164,10 @@ export function ProductForm({ open, onClose, editing }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6 bg-white">
-          <form id="product-form" onSubmit={handleSubmit} className="space-y-6">
-
+        {/* O FORMULÁRIO AGORA ENGLOBA A TELA INTEIRA E OS BOTÕES */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 bg-white space-y-6">
+            
             {/* CÂMERA DO CELULAR */}
             <div>
               <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-inkSoft">Foto do Produto</label>
@@ -185,7 +189,6 @@ export function ProductForm({ open, onClose, editing }: Props) {
                 <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-ink/90 active:scale-95">
                   <Camera className="h-4 w-4" />
                   {image ? 'Trocar Foto' : 'Tirar Foto / Galeria'}
-                  {/* ESSE INPUT ABRE A CÂMERA/GALERIA NO CELULAR */}
                   <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 </label>
               </div>
@@ -280,25 +283,26 @@ export function ProductForm({ open, onClose, editing }: Props) {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-inkSoft">Cor de Fundo do Card (Aparece atrás da foto transparente)</label>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-inkSoft">Cor de Fundo do Card</label>
               <div className="flex flex-wrap gap-3">
                 {GRADIENTS.map((g) => (
                   <button key={g} type="button" onClick={() => setGradient(g)} className={`h-10 w-10 rounded-full bg-gradient-to-br ${g} transition-transform ${gradient === g ? 'scale-110 ring-2 ring-ink ring-offset-2' : 'hover:scale-105'}`} />
                 ))}
               </div>
             </div>
-          </form>
-        </div>
+          </div>
 
-        <div className="border-t border-line bg-bg px-6 py-4 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="rounded-xl border border-line bg-white px-5 py-2.5 text-sm font-semibold text-inkSoft hover:bg-bgAlt hover:text-ink transition">
-            Cancelar
-          </button>
-          <button type="submit" form="product-form" className="flex items-center gap-2 rounded-xl bg-ink px-6 py-2.5 text-sm font-bold text-white transition hover:bg-ink/90 active:scale-95 shadow-md">
-            <Save className="h-4 w-4" />
-            {editing ? 'Salvar Alterações' : 'Cadastrar Produto'}
-          </button>
-        </div>
+          {/* BOTÕES DE SALVAR E CANCELAR AGORA ESTÃO AQUI DENTRO DO FORMULÁRIO */}
+          <div className="border-t border-line bg-bg px-6 py-4 flex justify-end gap-3 shrink-0">
+            <button type="button" onClick={onClose} className="rounded-xl border border-line bg-white px-5 py-2.5 text-sm font-semibold text-inkSoft hover:bg-bgAlt hover:text-ink transition">
+              Cancelar
+            </button>
+            <button type="submit" className="flex items-center gap-2 rounded-xl bg-ink px-6 py-2.5 text-sm font-bold text-white transition hover:bg-ink/90 active:scale-95 shadow-md">
+              <Save className="h-4 w-4" />
+              {editing ? 'Salvar Alterações' : 'Cadastrar Produto'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
