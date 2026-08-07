@@ -74,14 +74,13 @@ export function CheckoutModal({ open, onClose, onDone }: Props) {
     });
 
     // FUNIL — etapa 4: consideramos "compra concluída" no momento do envio ao WhatsApp.
-    // Se preferir só confirmar quando o pagamento cair de fato, mova esta chamada
-    // pra um botão manual no painel admin (ex: "Marcar pedido como pago").
     cart.forEach((item) => {
       trackFunnelEvent('purchase', item.product.id, item.product.name, item.quantity);
     });
     
     window.open(url, '_blank');
     setSent(true);
+    clearCart(); // <-- CARRINHO LIMPO AUTOMATICAMENTE AQUI
   };
 
   const handleClose = () => {
