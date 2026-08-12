@@ -45,6 +45,46 @@ interface StoreState {
   resetFlash: () => void;
 }
 
+// Função para exibir um Toast (notificação bonita na tela)
+function showToast(message: string, type: 'success' | 'error' = 'success') {
+  const existingToast = document.getElementById('custom-store-toast');
+  if (existingToast) existingToast.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'custom-store-toast';
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background-color: ${type === 'success' ? '#18181b' : '#7f1d1d'};
+    color: #f4f4f5;
+    padding: 12px 20px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    border: 1px solid ${type === 'success' ? '#27272a' : '#991b1b'};
+    z-index: 99999;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: slideInToast 0.25s ease-out forwards;
+  `;
+
+  const icon = type === 'success' ? '✓' : '✕';
+  const iconColor = type === 'success' ? '#4ade80' : '#f87171';
+
+  toast.innerHTML = `<span style="color: ${iconColor}; font-weight: bold; font-size: 16px;">${icon}</span> <span>${message}</span>`;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.25s ease-out';
+    setTimeout(() => toast.remove(), 250);
+  }, 3000);
+}
+
 function computeTotals(sales: Sale[]) {
   const now = Date.now();
   const oneDay = 24 * 60 * 60 * 1000;
@@ -197,7 +237,7 @@ export const useStore = create<StoreState>((set, get) => ({
   addToCart: (product, qty = 1, flavor = '') => {
     if (qty <= 0) return false;
     if (!flavor) {
-      alert('Por favor, selecione um sabor.');
+      showToast('Por favor, selecione um sabor.', 'error');
       return false;
     }
     const flavorEntry = (Array.isArray(product.flavors) ? product.flavors : []).find(
@@ -205,7 +245,7 @@ export const useStore = create<StoreState>((set, get) => ({
     );
     
     if (flavorEntry && flavorEntry.stock <= 0) {
-      alert('Esse sabor está esgotado.');
+      showToast('Esse sabor está esgotado.', 'error');
       return false;
     }
     
@@ -220,7 +260,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const requestedTotal = currentQtyInCart + qty;
       
       if (flavorEntry && requestedTotal > flavorEntry.stock) {
-        alert(`Só temos ${flavorEntry.stock} unidade(s) desse sabor em estoque.`);
+        showToast(`Só temos ${flavorEntry.stock} unidade(s) desse sabor em estoque.`, 'error');
         success = false;
         return state;
       }
@@ -245,6 +285,10 @@ export const useStore = create<StoreState>((set, get) => ({
       };
     });
     
+    if (success) {
+      showToast(`"${product.name}" (${flavor}) adicionado à sacola!`);
+    }
+
     return success;
   },
 
@@ -418,7 +462,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
       if (error) {
         console.error('Erro ao salvar produto no Supabase:', error);
-        alert('Erro ao salvar no banco: ' + error.message);
+        showToast('Erro ao salvar no banco: ' + error.message, 'error');
         return;
       }
 
@@ -426,6 +470,7 @@ export const useStore = create<StoreState>((set, get) => ({
         set((prev) => ({
           products: [...(Array.isArray(prev.products) ? prev.products : []), data],
         }));
+        showToast('Produto cadastrado com sucesso!');
       }
     } catch (err) {
       console.error('Erro inesperado ao cadastrar produto:', err);
@@ -469,6 +514,7 @@ export const useStore = create<StoreState>((set, get) => ({
       active: true,
     };
     set((prev) => ({ coupons: [...(prev.coupons || []), newCoupon] }));
+    showToast('Cupom criado com sucesso!');
     return { ok: true, message: 'Cupom criado com sucesso!' };
   },
 
