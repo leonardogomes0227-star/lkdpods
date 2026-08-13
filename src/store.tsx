@@ -105,18 +105,6 @@ function computeTotals(sales: Sale[]) {
   return { dailyTotal: daily, weeklyTotal: weekly, monthlyTotal: monthly };
 }
 
-function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: string, qty: number): FlavorStock[] {
-  const list = Array.isArray(flavors) ? flavors : [];
-  const now = Date.now();
-  const safeFlavorName = flavorName.trim().toLowerCase();
-  
-  return list.map((f) =>
-    f.name.trim().toLowerCase() === safeFlavorName
-      ? { ...f, stock: Math.max(0, f.stock - qty), lastSoldAt: now }
-      : f
-  );
-}
-
 function mapOrderFromDb(row: any): Order {
   return {
     id: row.id,
@@ -295,8 +283,14 @@ export const useStore = create<StoreState>((set, get) => ({
   recordSale: async (amount, customerInfo) => {
     const timestamp = Date.now();
     const state = get();
-    const cartItems = Array.isArray(state.cart) ? state.cart : [];
-    const totalCost = cartItems.reduce((sum, item) => sum + item.product.cost * item.quantity, 0);
+    const cartItems = [...(Array.isArray(state.cart) ? state.cart : [])];
+    
+    if (cartItems.length === 0) {
+      console.warn('Tentativa de registrar venda com carrinho vazio.');
+      return;
+    }
+
+    const totalCost = cartItems.reduce((sum, item) => sum + (item.product.cost || 0) * item.quantity, 0);
     const profit = amount - totalCost;
     const tempSaleId = Math.random().toString();
 
@@ -330,7 +324,15 @@ export const useStore = create<StoreState>((set, get) => ({
 
     for (const item of cartItems) {
       const product = item.product;
-      const updatedFlavors = decrementFlavorStock(product.flavors, item.selectedFlavor, item.quantity);
+      const rawFlavors = Array.isArray(product.flavors) ? product.flavors : [];
+      
+      const updatedFlavors = rawFlavors.map((f) => {
+        const matches = f.name.trim().toLowerCase() === item.selectedFlavor.trim().toLowerCase();
+        return matches
+          ? { ...f, stock: Math.max(0, f.stock - item.quantity), lastSoldAt: timestamp }
+          : f;
+      });
+
       const newTotalStock = updatedFlavors.reduce((sum, f) => sum + f.stock, 0);
 
       set((prev) => ({
@@ -340,12 +342,16 @@ export const useStore = create<StoreState>((set, get) => ({
       }));
 
       try {
-        await supabase
+        const { error: updateError } = await supabase
           .from('products')
           .update({ flavors: updatedFlavors, stock: newTotalStock })
           .eq('id', product.id);
+
+        if (updateError) {
+          console.error(`Erro ao atualizar estoque do produto ${product.id}:`, updateError.message);
+        }
       } catch (e) {
-        console.error('Erro ao atualizar estoque no banco:', e);
+        console.error('Erro de conexão ao atualizar estoque no banco:', e);
       }
 
       if (orderId) {
