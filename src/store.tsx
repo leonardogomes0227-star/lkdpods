@@ -105,7 +105,7 @@ function computeTotals(sales: Sale[]) {
   return { dailyTotal: daily, weeklyTotal: weekly, monthlyTotal: monthly };
 }
 
-// Função de baixa de estoque blindada para nunca falhar o match
+// Função de baixa de estoque blindada
 function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: string, qty: number): FlavorStock[] {
   const list = Array.isArray(flavors) ? flavors : [];
   const now = Date.now();
@@ -121,7 +121,6 @@ function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: st
     return f;
   });
 
-  // Se não achou o nome exato mas existe apenas 1 opção de sabor, abate nele para não travar o estoque
   if (!matched && list.length > 0) {
     updated[0] = { ...updated[0], stock: Math.max(0, updated[0].stock - qty), lastSoldAt: now };
   }
@@ -318,6 +317,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const profit = amount - totalCost;
     const tempSaleId = Math.random().toString();
 
+    // ATUALIZA OS TOTAIS FINANCEIROS DE DIA, SEMANA E MÊS IMEDIATAMENTE NA TELA
     set((prev) => {
       const newSales = [...(prev.sales || []), { id: tempSaleId, amount, timestamp }];
       return { sales: newSales, ...computeTotals(newSales) };
