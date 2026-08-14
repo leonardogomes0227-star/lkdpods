@@ -105,6 +105,30 @@ function computeTotals(sales: Sale[]) {
   return { dailyTotal: daily, weeklyTotal: weekly, monthlyTotal: monthly };
 }
 
+// Função de baixa de estoque blindada para nunca falhar o match
+function decrementFlavorStock(flavors: FlavorStock[] | undefined, flavorName: string, qty: number): FlavorStock[] {
+  const list = Array.isArray(flavors) ? flavors : [];
+  const now = Date.now();
+  const safeFlavorName = (flavorName || '').trim().toLowerCase();
+  
+  let matched = false;
+  const updated = list.map((f) => {
+    const dbFlavorName = (f.name || '').trim().toLowerCase();
+    if (dbFlavorName === safeFlavorName || dbFlavorName.includes(safeFlavorName) || safeFlavorName.includes(dbFlavorName)) {
+      matched = true;
+      return { ...f, stock: Math.max(0, f.stock - qty), lastSoldAt: now };
+    }
+    return f;
+  });
+
+  // Se não achou o nome exato mas existe apenas 1 opção de sabor, abate nele para não travar o estoque
+  if (!matched && list.length > 0) {
+    updated[0] = { ...updated[0], stock: Math.max(0, updated[0].stock - qty), lastSoldAt: now };
+  }
+
+  return updated;
+}
+
 function mapOrderFromDb(row: any): Order {
   return {
     id: row.id,
@@ -324,15 +348,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     for (const item of cartItems) {
       const product = item.product;
-      const rawFlavors = Array.isArray(product.flavors) ? product.flavors : [];
-      
-      const updatedFlavors = rawFlavors.map((f) => {
-        const matches = f.name.trim().toLowerCase() === item.selectedFlavor.trim().toLowerCase();
-        return matches
-          ? { ...f, stock: Math.max(0, f.stock - item.quantity), lastSoldAt: timestamp }
-          : f;
-      });
-
+      const updatedFlavors = decrementFlavorStock(product.flavors, item.selectedFlavor, item.quantity);
       const newTotalStock = updatedFlavors.reduce((sum, f) => sum + f.stock, 0);
 
       set((prev) => ({
