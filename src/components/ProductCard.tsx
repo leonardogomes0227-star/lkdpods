@@ -1,4 +1,4 @@
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Box } from 'lucide-react';
 import type { Product } from '../types';
 import { formatBRL } from '../utils';
 import { useState } from 'react';
@@ -30,6 +30,31 @@ export function ProductCard({ product }: Props) {
     <div 
       className="group relative flex flex-col overflow-hidden rounded-3xl border border-line bg-white p-4 transition-all hover:-translate-y-1 hover:shadow-xl"
     >
+      {/* Estilos do elemento 3D flutuante — escopado por classe única */}
+      <style>{`
+        @keyframes floatSpin3d {
+          0% { transform: translateY(0px) rotateX(0deg) rotateY(0deg); }
+          50% { transform: translateY(-6px) rotateX(180deg) rotateY(160deg); }
+          100% { transform: translateY(0px) rotateX(360deg) rotateY(360deg); }
+        }
+        .card-3d-perspective {
+          perspective: 600px;
+        }
+        .card-3d-icon {
+          transform-style: preserve-3d;
+          animation: floatSpin3d 6s ease-in-out infinite;
+          transition: animation-duration 0.3s;
+        }
+        .group:hover .card-3d-icon {
+          animation-duration: 2.5s;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .card-3d-icon {
+            animation: none;
+          }
+        }
+      `}</style>
+
       {/* Imagem Real ou Gradient com Emoji */}
       <div className={`relative mb-4 flex h-48 items-center justify-center rounded-2xl bg-gradient-to-br ${product.gradient} overflow-hidden transition-transform duration-500 group-hover:scale-[1.02]`}>
         
@@ -40,6 +65,13 @@ export function ProductCard({ product }: Props) {
             {product.emoji}
           </span>
         )}
+
+        {/* Elemento 3D flutuante decorativo */}
+        <div className="card-3d-perspective pointer-events-none absolute bottom-3 right-3 h-9 w-9">
+          <div className="card-3d-icon flex h-9 w-9 items-center justify-center rounded-lg bg-white/25 text-white shadow-lg backdrop-blur-sm ring-1 ring-white/40">
+            <Box className="h-4 w-4 drop-shadow" strokeWidth={2.2} />
+          </div>
+        </div>
         
         {product.stock <= 5 && product.stock > 0 && (
           <span className="absolute left-3 top-3 rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase text-red-600 shadow-sm">
