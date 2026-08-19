@@ -14,6 +14,8 @@ interface StoreState {
   isAuthed: boolean;
   flashDeadline: number;
   addToCart: (product: Product, qty?: number, flavor?: string) => boolean;
+  removeFromCart: (productId: string, flavor: string) => void;
+  setQty: (productId: string, flavor: string, qty: number) => void;
   recordSale: (amount: number, customerInfo?: { name: string; phone: string }) => Promise<void>;
   clearCart: () => void;
   setAuthed: (authed: boolean) => void;
@@ -30,31 +32,26 @@ export const useStore = create<StoreState>((set, get) => ({
   appliedCoupon: null,
   isAuthed: false,
   flashDeadline: Date.now() + 24 * 60 * 60 * 1000,
-
   setAuthed: (authed) => set({ isAuthed: authed }),
-
   addToCart: (product, qty = 1, flavor = '') => {
     if (qty <= 0) return false;
     if (!flavor) {
       alert('Por favor, selecione um sabor.');
       return false;
     }
-
     let success = false;
     set((state) => {
       const prev = state.cart;
       const existing = prev.find((c) => c.product.id === product.id && c.selectedFlavor === flavor);
       const currentQtyInCart = existing ? existing.quantity : 0;
       const requestedTotal = currentQtyInCart + qty;
-
       success = true;
       const newCart = existing
         ? prev.map((c) => (c.product.id === product.id && c.selectedFlavor === flavor ? { ...c, quantity: requestedTotal } : c))
         : [...prev, { product, quantity: qty, selectedFlavor: flavor }];
-      
+
       const newCount = newCart.reduce((sum, item) => sum + item.quantity, 0);
       const newSubtotal = newCart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-
       return {
         cart: newCart,
         cartCount: newCount,
@@ -64,32 +61,61 @@ export const useStore = create<StoreState>((set, get) => ({
     });
     return success;
   },
+  removeFromCart: (productId, flavor) => {
+    set((state) => {
+      const newCart = state.cart.filter(
+        (c) => !(c.product.id === productId && c.selectedFlavor === flavor),
+      );
+      const newCount = newCart.reduce((sum, item) => sum + item.quantity, 0);
+      const newSubtotal = newCart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      return {
+        cart: newCart,
+        cartCount: newCount,
+        subtotal: newSubtotal,
+        total: newSubtotal - state.discount,
+      };
+    });
+  },
+  setQty: (productId, flavor, qty) => {
+    set((state) => {
+      // se a nova quantidade for 0 ou negativa, remove o item do carrinho
+      const newCart =
+        qty <= 0
+          ? state.cart.filter((c) => !(c.product.id === productId && c.selectedFlavor === flavor))
+          : state.cart.map((c) =>
+              c.product.id === productId && c.selectedFlavor === flavor ? { ...c, quantity: qty } : c,
+            );
 
+      const newCount = newCart.reduce((sum, item) => sum + item.quantity, 0);
+      const newSubtotal = newCart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      return {
+        cart: newCart,
+        cartCount: newCount,
+        subtotal: newSubtotal,
+        total: newSubtotal - state.discount,
+      };
+    });
+  },
   recordSale: async (amount, customerInfo) => {
     const timestamp = Date.now();
     const tempId = Math.random().toString();
     const state = get();
-    
-    set((prev) => ({ sales: [...prev.sales, { id: tempId, amount, timestamp }] }));
 
+    set((prev) => ({ sales: [...prev.sales, { id: tempId, amount, timestamp }] }));
     await supabase
       .from('sales')
       .insert([{ amount, timestamp }]);
-
     for (const item of state.cart) {
       const product = item.product;
       const newStock = Math.max(0, product.stock - item.quantity);
-
       set((prev) => ({
         products: prev.products.map((p) => (p.id === product.id ? { ...p, stock: newStock } : p))
       }));
-
       await supabase
         .from('products')
         .update({ stock: newStock })
         .eq('id', product.id);
     }
-
     if (customerInfo && customerInfo.phone) {
       await supabase.from('customers').upsert([
         {
@@ -101,6 +127,5 @@ export const useStore = create<StoreState>((set, get) => ({
       ], { onConflict: 'phone' });
     }
   },
-
   clearCart: () => set({ cart: [], cartCount: 0, subtotal: 0, total: 0, discount: 0, appliedCoupon: null }),
 }));
