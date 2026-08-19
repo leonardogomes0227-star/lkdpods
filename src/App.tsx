@@ -76,7 +76,7 @@ function Footer() {
                 Redes
               </p>
               <div className="flex gap-2">
-                
+                <a
                   href="https://www.instagram.com/lkd_importes?igsh=cm45M2VnMzQ2czhk&utm_source=qr"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -84,7 +84,7 @@ function Footer() {
                 >
                   <Instagram className="h-5 w-5" />
                 </a>
-                
+                <a
                   href="#"
                   className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-ink transition-all duration-300 hover:scale-110 hover:border-accent/40 hover:text-accent active:scale-95"
                 >
@@ -123,6 +123,7 @@ export default function App() {
     const load = async () => {
       const start = Date.now();
       await fetchProducts();
+      // garante um tempo mínimo de exibição, pra não "piscar" quando carrega rápido demais
       const minDuration = 900;
       const elapsed = Date.now() - start;
       const wait = Math.max(0, minDuration - elapsed);
