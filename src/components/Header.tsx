@@ -15,9 +15,12 @@ export function Header({ onOpenCart, onOpenAdmin, onOpenPortal, search, setSearc
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
         <a href="#top" className="flex shrink-0 items-center gap-2.5 transition-transform duration-300 hover:scale-105">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-neutral-800 to-neutral-950 border border-neutral-800 text-2xl shadow-md">
-            🦍
-          </div>
+          {/* LOGO OFICIAL POR URL DIRETA */}
+          <img 
+            src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150" 
+            alt="LKD Importes" 
+            className="h-10 w-10 rounded-xl object-cover border border-neutral-800 shadow-md" 
+          />
           <div className="hidden sm:block">
             <p className="font-display text-base font-bold leading-none text-ink tracking-wide">
               LKD <span className="text-accent">Imports</span>
