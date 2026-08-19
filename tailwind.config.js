@@ -7,15 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#0e0d0c',
-        bgAlt: '#1a1817',
-        ink: '#f5f2ee',
-        inkSoft: '#a9a29b',
-        line: '#2a2725',
-        accent: '#d97757',
+        bg: '#FAFAF8',
+        bgAlt: '#F1F0EC',
+        ink: '#15181B',
+        inkSoft: '#52565C',
+        line: '#E4E2DC',
+        accent: '#4C7A3F',
+        accentSoft: '#E9EFE4',
       },
       fontFamily: {
-        display: ['"Playfair Display"', 'serif'],
+        display: ['Archivo', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'monospace'],
       },
       keyframes: {
         'slide-up': {
@@ -44,6 +47,18 @@ export default {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(250%)' },
         },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-18px)' },
+        },
+        floatSlow: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-28px)' },
+        },
+        fadeUp: {
+          '0%': { opacity: '0', transform: 'translateY(24px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'slide-up': 'slide-up 0.2s ease-out forwards',
@@ -52,6 +67,9 @@ export default {
         'scale-in': 'scale-in 0.2s ease-out forwards',
         flipDown: 'flipDown 0.5s ease-in-out',
         sweep: 'sweep 3.5s ease-in-out infinite',
+        float: 'float 6s ease-in-out infinite',
+        floatSlow: 'floatSlow 9s ease-in-out infinite',
+        fadeUp: 'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) both',
       },
     },
   },
