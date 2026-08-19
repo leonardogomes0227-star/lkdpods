@@ -1,5 +1,5 @@
 import { Lock, Search, ShoppingBag, Star, Instagram } from 'lucide-react';
-import logo from '../logo.png'; // <--- Puxa a sua logo oficial da pasta src
+import logo from '../logo.png';
 import { useStore } from '../store';
 
 interface Props {
@@ -16,11 +16,11 @@ export function Header({ onOpenCart, onOpenAdmin, onOpenPortal, search, setSearc
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
         <a href="#top" className="flex shrink-0 items-center gap-2.5 transition-transform duration-300 hover:scale-105">
-          {/* SUA LOGO OFICIAL */}
+          {/* LOGO SEM O QUADRADO BRANCO (Fundo transparente e altura ajustada) */}
           <img 
             src={logo} 
             alt="LKD Importes" 
-            className="h-10 w-auto object-contain" 
+            className="h-11 w-auto object-contain bg-transparent" 
           />
         </a>
 
