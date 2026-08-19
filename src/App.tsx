@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Check, Flame, Instagram, MessageCircle, Truck } from 'lucide-react';
 import { useStore } from './store';
@@ -14,6 +13,7 @@ import { AdminLogin } from './components/AdminLogin';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ProductModal } from './components/ProductModal';
 import { CustomerPortalModal } from './components/CustomerPortalModal';
+import { SplashScreen } from './components/SplashScreen';
 import type { Product } from './types';
 
 function Toast({ message }: { message: string }) {
@@ -76,7 +76,7 @@ function Footer() {
                 Redes
               </p>
               <div className="flex gap-2">
-                <a
+                
                   href="https://www.instagram.com/lkd_importes?igsh=cm45M2VnMzQ2czhk&utm_source=qr"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -84,7 +84,7 @@ function Footer() {
                 >
                   <Instagram className="h-5 w-5" />
                 </a>
-                <a
+                
                   href="#"
                   className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-white text-ink transition-all duration-300 hover:scale-110 hover:border-accent/40 hover:text-accent active:scale-95"
                 >
@@ -105,19 +105,36 @@ function Footer() {
 
 export default function App() {
   const { flashDeadline, isAuthed, addToCart, fetchProducts } = useStore();
-  
+
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const [portalOpen, setPortalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  
+  const [showSplash, setShowSplash] = useState(true);
+
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productModalOpen, setProductModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchProducts();
+    let mounted = true;
+
+    const load = async () => {
+      const start = Date.now();
+      await fetchProducts();
+      const minDuration = 900;
+      const elapsed = Date.now() - start;
+      const wait = Math.max(0, minDuration - elapsed);
+      setTimeout(() => {
+        if (mounted) setShowSplash(false);
+      }, wait);
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
   }, [fetchProducts]);
 
   const handleProductClick = (p: Product) => {
@@ -131,6 +148,8 @@ export default function App() {
 
   return (
     <div id="top" className="relative min-h-screen bg-bg">
+      <SplashScreen visible={showSplash} />
+
       <AnimatedBackground />
       <div className="relative z-10">
         <FlashBanner deadline={flashDeadline} />
@@ -159,7 +178,7 @@ export default function App() {
         onClose={() => setCheckoutOpen(false)}
         onDone={() => setCheckoutOpen(false)}
       />
-      
+
       <ProductModal
         product={selectedProduct}
         isOpen={productModalOpen}
