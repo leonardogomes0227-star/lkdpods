@@ -10,14 +10,16 @@ export const Hero: React.FC = () => {
 
   const featuredProduct = products.find((p) => p.featured) || products[0];
 
-  const flavorList = featuredProduct?.flavor
-    ? featuredProduct.flavor.split(',').map((f) => f.trim()).filter(Boolean)
-    : ['Padrão'];
-  const [selectedFlavor, setSelectedFlavor] = useState<string>(flavorList[0] || '');
+  const flavorList =
+    featuredProduct?.flavors && featuredProduct.flavors.length > 0
+      ? featuredProduct.flavors.filter((f) => f.stock > 0).map((f) => f.name)
+      : [];
+  const displayFlavors = flavorList.length > 0 ? flavorList : ['Padrão'];
+  const [selectedFlavor, setSelectedFlavor] = useState<string>(displayFlavors[0] || '');
 
   // se o produto em destaque mudar (ex: dados chegam depois do carregamento), atualiza o sabor padrão
   useEffect(() => {
-    setSelectedFlavor(flavorList[0] || '');
+    setSelectedFlavor(displayFlavors[0] || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuredProduct?.id]);
 
@@ -166,7 +168,7 @@ export const Hero: React.FC = () => {
                     onChange={(e) => setSelectedFlavor(e.target.value)}
                     className="w-full rounded-xl border border-line bg-white px-3 py-2 text-xs font-medium text-ink outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
                   >
-                    {flavorList.map((flav, idx) => (
+                    {displayFlavors.map((flav, idx) => (
                       <option key={idx} value={flav}>
                         {flav}
                       </option>
