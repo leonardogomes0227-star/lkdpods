@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { useStore } from '../store';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Sparkles } from 'lucide-react';
 
 export const Hero: React.FC = () => {
   const { products, addToCart } = useStore();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
 
   const featuredProduct = products.find((p) => p.featured) || products[0];
 
   const handleQuickBuy = () => {
     if (!featuredProduct) return;
-    // Pega o primeiro sabor disponível ou vazio
     const defaultFlavor = featuredProduct.flavor ? featuredProduct.flavor.split(',')[0].trim() : '';
     const success = addToCart(featuredProduct, 1, defaultFlavor);
     if (success) {
@@ -17,80 +19,127 @@ export const Hero: React.FC = () => {
     }
   };
 
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+
+    const rotateY = (px - 0.5) * 20;
+    const rotateX = (0.5 - py) * 20;
+
+    setTilt({ x: rotateX, y: rotateY });
+    setGlare({ x: px * 100, y: py * 100, opacity: 0.5 });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+    setGlare((g) => ({ ...g, opacity: 0 }));
+  };
+
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-neutral-950 p-6 sm:p-8 md:p-12 text-white shadow-2xl border border-neutral-800 my-4 mx-4 sm:mx-6">
-      <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-        <div className="max-w-xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-4 shadow-inner">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            🔥 DESTAQUE DA SEMANA
+    <div className="relative mx-4 my-4 overflow-hidden rounded-3xl border border-line bg-white p-6 shadow-[0_20px_60px_-15px_rgba(21,24,27,0.12)] sm:mx-6 sm:p-8 md:p-12">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_20%_20%,rgba(76,122,63,0.06),transparent_60%)]" />
+      <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_75%_75%_at_50%_40%,transparent_40%,black_100%)] bg-ink/[0.025]" />
+
+      <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-accentSoft blur-3xl animate-float" />
+      <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-accent/10 blur-3xl animate-floatSlow" />
+
+      <div className="relative z-10 flex flex-col items-center justify-between gap-10 md:flex-row">
+        <div className="max-w-xl animate-fadeUp">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accentSoft px-3 py-1 text-xs font-semibold text-accent shadow-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+            </span>
+            <Sparkles className="h-3.5 w-3.5" />
+            DESTAQUE DA SEMANA
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold tracking-tight mb-4 text-white">
-            Sua tabacaria com estilo e confiança.
+          <h1 className="mb-4 font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl md:text-6xl">
+            Sua tabacaria com{' '}
+            <span className="relative inline-block">
+              estilo
+              <svg className="absolute -bottom-1 left-0 w-full text-accent" viewBox="0 0 200 12" fill="none" preserveAspectRatio="none">
+                <path d="M2 9C40 2 160 2 198 9" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+              </svg>
+            </span>{' '}
+            e confiança.
           </h1>
-          <p className="text-neutral-400 text-sm md:text-lg mb-6 leading-relaxed font-normal">
+          <p className="mb-6 text-sm font-light leading-relaxed text-inkSoft md:text-lg">
             Os melhores descartáveis, vapes recarregáveis, essências e acessórios das marcas mais desejadas. Qualidade garantida e atendimento rápido.
           </p>
         </div>
 
-        {/* Card Destaque com Ação de Compra Rápida */}
         {featuredProduct && (
-          <div className="w-full md:w-80 bg-neutral-900 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-2xl transition-all hover:border-emerald-500/50 group flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
-                    {featuredProduct.brand}
+          <div style={{ perspective: '1000px' }} className="w-full md:w-80">
+            <div
+              ref={cardRef}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              style={{
+                transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${tilt.x || tilt.y ? 1.02 : 1})`,
+                transformStyle: 'preserve-3d',
+                transition: tilt.x || tilt.y ? 'transform 0.08s ease-out' : 'transform 0.5s ease-out',
+              }}
+              className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-line bg-bg p-5 shadow-[0_25px_50px_-12px_rgba(21,24,27,0.18)] sm:p-6"
+            >
+              <div
+                className="pointer-events-none absolute inset-0 z-20 transition-opacity duration-200"
+                style={{
+                  opacity: glare.opacity,
+                  background: `radial-gradient(circle 180px at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.55), transparent 70%)`,
+                }}
+              />
+
+              <div style={{ transform: 'translateZ(30px)' }}>
+                <div className="mb-4 flex items-start justify-between">
+                  <div>
+                    <span className="rounded-md border border-accent/20 bg-accentSoft px-2.5 py-1 text-xs font-bold uppercase tracking-widest text-accent">
+                      {featuredProduct.brand}
+                    </span>
+                    <h3 className="mt-2 font-display text-lg font-extrabold text-ink transition-colors sm:text-xl">
+                      {featuredProduct.name}
+                    </h3>
+                    {featuredProduct.flavor && (
+                      <p className="mt-1 line-clamp-2 text-xs text-inkSoft">{featuredProduct.flavor}</p>
+                    )}
+                  </div>
+                  <span className="rounded-full bg-gradient-to-r from-accent to-emerald-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg shadow-accent/20 animate-pulse">
+                    Em Alta
                   </span>
-                  <h3 className="text-lg sm:text-xl font-extrabold text-white mt-2 group-hover:text-emerald-300 transition-colors">
-                    {featuredProduct.name}
-                  </h3>
-                  {featuredProduct.flavor && (
-                    <p className="text-xs text-neutral-400 mt-1 line-clamp-2">
-                      {featuredProduct.flavor}
-                    </p>
+                </div>
+
+                <div style={{ transform: 'translateZ(50px)' }} className="my-4 flex h-40 items-center justify-center overflow-hidden rounded-2xl border border-line bg-white shadow-inner transition-transform duration-300 group-hover:scale-[1.03]">
+                  {featuredProduct.image ? (
+                    <img src={featuredProduct.image} alt={featuredProduct.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-6xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.15)] sm:text-7xl">
+                      {featuredProduct.emoji || '⚡'}
+                    </span>
                   )}
                 </div>
-                <span className="text-[10px] uppercase font-bold tracking-wider bg-gradient-to-r from-emerald-500 to-teal-500 text-neutral-950 px-2.5 py-1 rounded-full shadow-lg shadow-emerald-500/20 animate-pulse">
-                  Em Alta
-                </span>
-              </div>
 
-              {/* Imagem Real do Pod (se houver) ou Emoji */}
-              <div className="h-40 my-4 flex items-center justify-center bg-neutral-950 rounded-2xl shadow-inner border border-neutral-800/80 overflow-hidden group-hover:scale-[1.02] transition-transform duration-300">
-                {featuredProduct.image ? (
-                  <img 
-                    src={featuredProduct.image} 
-                    alt={featuredProduct.name} 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-6xl sm:text-7xl filter drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
-                    {featuredProduct.emoji || '⚡'}
-                  </span>
-                )}
-              </div>
+                <div className="mb-4 grid grid-cols-2 gap-3 border-t border-line pt-3 text-center">
+                  <div className="rounded-xl border border-line bg-white p-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-inkSoft">Preço</p>
+                    <p className="mt-0.5 text-sm font-black text-accent sm:text-base">R$ {Number(featuredProduct.price).toFixed(2)}</p>
+                  </div>
+                  <div className="rounded-xl border border-line bg-white p-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-inkSoft">Estoque</p>
+                    <p className="mt-0.5 text-sm font-extrabold text-ink sm:text-base">{featuredProduct.stock} un.</p>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-neutral-800 text-center mb-4">
-                <div className="bg-neutral-950/80 p-2.5 rounded-xl border border-neutral-800/50">
-                  <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Preço</p>
-                  <p className="text-sm sm:text-base font-black text-emerald-400 mt-0.5">R$ {Number(featuredProduct.price).toFixed(2)}</p>
-                </div>
-                <div className="bg-neutral-950/80 p-2.5 rounded-xl border border-neutral-800/50">
-                  <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Estoque</p>
-                  <p className="text-sm sm:text-base font-extrabold text-white mt-0.5">{featuredProduct.stock} un.</p>
-                </div>
+                <button
+                  onClick={handleQuickBuy}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-accent active:scale-95"
+                >
+                  <ShoppingBag className="h-4 w-4" />
+                  Comprar Agora
+                </button>
               </div>
             </div>
-
-            {/* Botão de Compra Direta */}
-            <button
-              onClick={handleQuickBuy}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm active:scale-95"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              Comprar Agora
-            </button>
           </div>
         )}
       </div>
