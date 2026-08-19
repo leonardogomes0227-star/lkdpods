@@ -1,6 +1,6 @@
+
 import { useState, useEffect } from 'react';
 import { Check, Flame, Instagram, MessageCircle, Truck } from 'lucide-react';
-import logo from './logo.png'; // <--- Logo importada aqui
 import { useStore } from './store';
 import { AnimatedBackground } from './components/AnimatedBackground';
 import { FlashBanner } from './components/FlashBanner';
@@ -37,12 +37,12 @@ function Footer() {
           <Reveal>
             <div>
               <div className="flex items-center gap-2">
-                {/* LOGO ATUALIZADA NO RODAPÉ */}
-                <img 
-                  src={logo} 
-                  alt="LKD Importes" 
-                  className="h-10 w-auto object-contain" 
-                />
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink font-display text-lg font-bold text-white shadow-sm">
+                  L
+                </div>
+                <p className="font-display text-lg font-bold text-ink">
+                  LKD <span className="text-accent">Imports</span>
+                </p>
               </div>
               <p className="mt-3 max-w-xs text-sm font-light leading-relaxed text-inkSoft">
                 Tabacaria underground com os pods, vapes, essências e acessórios mais desejados.
