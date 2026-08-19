@@ -15,10 +15,12 @@ export function ProductCard({ product }: Props) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
 
-  const flavorList = product.flavor
-    ? product.flavor.split(',').map((f) => f.trim()).filter(Boolean)
-    : ['Padrão'];
-  const [selectedFlavor, setSelectedFlavor] = useState<string>(flavorList[0] || '');
+  const flavorList =
+    product.flavors && product.flavors.length > 0
+      ? product.flavors.filter((f) => f.stock > 0).map((f) => f.name)
+      : [];
+  const displayFlavors = flavorList.length > 0 ? flavorList : ['Padrão'];
+  const [selectedFlavor, setSelectedFlavor] = useState<string>(displayFlavors[0] || '');
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -61,6 +63,7 @@ export function ProductCard({ product }: Props) {
         }}
         className="group relative flex flex-col overflow-hidden rounded-3xl border border-line bg-white p-4 shadow-sm transition-shadow duration-300 hover:shadow-[0_25px_45px_-15px_rgba(21,24,27,0.2)]"
       >
+        {/* Glare que segue o mouse */}
         <div
           className="pointer-events-none absolute inset-0 z-20 rounded-3xl transition-opacity duration-200"
           style={{
@@ -85,6 +88,7 @@ export function ProductCard({ product }: Props) {
             </span>
           )}
 
+          {/* Vinheta suave dentro da imagem, dá profundidade sem escurecer o produto */}
           <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_40px_10px_rgba(0,0,0,0.08)]" />
 
           {product.stock <= 5 && product.stock > 0 && (
@@ -115,7 +119,7 @@ export function ProductCard({ product }: Props) {
               onClick={(e) => e.stopPropagation()}
               className="w-full rounded-xl border border-line bg-neutral-50 px-3 py-2 text-xs font-medium text-ink outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
             >
-              {flavorList.map((flav, idx) => (
+              {displayFlavors.map((flav, idx) => (
                 <option key={idx} value={flav}>
                   {flav}
                 </option>
