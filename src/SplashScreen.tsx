@@ -13,9 +13,7 @@ export function SplashScreen({ visible }: Props) {
     >
       <div className="flex flex-col items-center gap-5">
         <div className="relative flex h-24 w-24 items-center justify-center">
-          {/* Anel base */}
           <span className="absolute inset-0 rounded-full border-2 border-line" />
-          {/* Anel girando */}
           <span
             className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-accent"
             style={{ animationDuration: '1s' }}
